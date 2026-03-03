@@ -17,9 +17,11 @@ EUCapML Mentor is built from three conceptual layers:
 
 ### **1. Engines (top‑level orchestration)**
 These implement the high‑level behaviours:
-
-- `FeedbackEngine` → evaluates student answers against model solutions  
-- `ChatEngine` → delivers a RAG‑augmented legal tutor chatbot  
+- **`FeedbackEngine`** → evaluates student answers against model solutions **and** provides:
+  - **Plan**: help students plan an answer before writing (outline, topics, anchors)
+  - **Evaluate**: assess a finished answer (similarity, coverage, structured feedback)
+  - **Explain**: answer follow‑up “why” questions about the feedback
+- **`ChatEngine`** → RAG‑augmented legal tutor (booklet + optional web), independent of model answers
 
 Each engine has its own prompts, retrieval strategy, and post‑processing.
 
@@ -45,7 +47,7 @@ eucapml-mentor/
 ├── requirements.txt
 └── mentor/
 ├── engines/
-│   ├── feedback_engine.py   # Exam-style evaluator
+│   ├── feedback_engine.py    Exam-style evaluator: plan/evaluate/explain
 │   └── chat_engine.py       # RAG-based tutor
 │
 ├── rag/
@@ -67,6 +69,15 @@ eucapml-mentor/
 ---
 
 ## ⚙️ Module Responsibilities
+## ⚙️ Modules at a glance
+
+- `mentor/engines/feedback_engine.py` — Plan / Evaluate / Explain a case.
+- `mentor/engines/chat_engine.py` — RAG‑augmented tutor (booklet + optional web).
+- `mentor/rag/` — booklet index + filters + snippet retrieval.
+- `mentor/llm/` — model‑agnostic client (e.g., Groq).
+- `mentor/booklet/` — parse DOCX booklet, extract anchors.
+- `mentor/core.py` — shared helpers (keywords, similarity, citations).
+- `mentor/prompts.py` — prompts (evaluator, planner, explainer, chat).
 
 ### **engines/**
 #### `feedback_engine.py`
