@@ -89,17 +89,6 @@ with tab_feedback:
             key=f"answer::{sel_case.get('id','unknown')}::{q_label}"
         )
         
-        run = st.button("Run task", type="primary")
-        
-        # Model answer slice (authoritative) — later replace with a lookup from your private JSON
-        with st.expander("Model answer slice (authoritative) — paste or load later", expanded=(mode == "Evaluate")):
-            model_answer_slice = st.text_area(
-                "Model answer (used for 'Evaluate' and to structure feedback)",
-                height=160,
-                key=f"model::{_key(sel_case['id'], q_label)}"
-            )
-
-        # 5) Action
         run = st.button(
             "Run task",
             type="primary",
