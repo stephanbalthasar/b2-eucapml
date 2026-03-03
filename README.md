@@ -188,7 +188,7 @@ LLM client mock responses
 
 ### **🚀 Run the App**
 In development:
-Shellstreamlit run streamlit_app.pyWeitere Zeilen anzeigen
+Shellstreamlit run streamlit_app.py
 
 ### **📜 License**
 TBD.
