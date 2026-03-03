@@ -98,6 +98,8 @@ This allows swapping Groq, OpenRouter, or local models without changing engines.
 groq.py
 Concrete implementation for Groq’s Llama models.
 
+---
+
 ### **rag/**
 #### `index.py`
 Builds and stores the semantic index of booklet chunks:
@@ -123,6 +125,8 @@ ranking
 snippet grouping
 
 Used by both engines with different settings.
+
+---
 
 ### **booklet/**
 #### `parse.py`
@@ -164,7 +168,9 @@ Conversational, explanatory, RAG‑grounded, no exam structure
 
 Optionally includes shared guardrails.
 
-🧪 Testing Strategy (recommended)
+---
+
+### **🧪 Testing Strategy (recommended)**
 Add tests under tests/:
 
 booklet parsing
@@ -173,14 +179,14 @@ similarity/coverage metrics
 LLM client mock responses
 
 
-🚀 Run the App
+### **🚀 Run the App**
 In development:
 Shellstreamlit run streamlit_app.pyWeitere Zeilen anzeigen
 
-📜 License
+### **📜 License**
 TBD.
 
-👤 Author
+### **👤 Author**
 Stephan Balthasar (Allianz SE)
 
 End of README.md
