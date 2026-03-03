@@ -63,6 +63,8 @@ eucapml-mentor/
 ├── core.py                  # Shared utilities
 └── prompts.py               # Prompt templates for both engines
 
+---
+
 ## ⚙️ Module Responsibilities
 
 ### **engines/**
