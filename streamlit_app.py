@@ -108,14 +108,9 @@ with tab_feedback:
                 # (a) model-answer slice for the selected question
                 sections = sel_case.get("model_answer_sections") or []
                 model_slice = sections[q_index] if (0 <= q_index < len(sections)) else ""
-            
-                # (b) best booklet chapter (query: case title + question label + short anchor from model slice)
-                #     You already have chap_retriever in scope.
-                #     Keep the query short to avoid noise.
-                anchor = (model_slice or "")[:400]
-                query  = f"{sel_case.get('title','')} {q_label} {anchor}"
-                best_chapter = chap_retriever.retrieve_best(query) if chap_retriever else None
-                booklet_text = (best_chapter or {}).get("text", "")
+                
+                # (b) planner prompt does NOT include booklet grounding anymore
+                booklet_none = ""
             
                 # call Plan with all 3 inputs
                 with st.spinner("Planning..."):
@@ -123,7 +118,7 @@ with tab_feedback:
                         case_text=sel_case.get("description", f"[{sel_case['title']}]"),
                         question=q_label,
                         model_answer_slice=model_slice,
-                        booklet_text=booklet_text,
+                        booklet_text=booklet_none,
                         model=model,
                         temperature=temp
                     )
