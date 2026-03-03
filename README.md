@@ -143,6 +143,8 @@ detect “Case Study 30”
 detect “para. 115”
 handle citation strings
 
+---
+
 #### `core.py`
 Shared utilities:
 
@@ -153,6 +155,8 @@ citation number detection
 truncation helpers
 
 Simple, reusable functions with no Streamlit or LLM dependencies.
+
+---
 
 #### `prompts.py`
 Contains two distinct prompt sets:
