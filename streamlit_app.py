@@ -63,32 +63,33 @@ with tab_feedback:
 
     # --- (A) LEFT: inputs ---
     with left:
-        # 1) Case & question
-        # If you already load model answers/cases from a JSON, wire it here.
-        # For now, a tiny placeholder bank so the UI flows end-to-end:
-        cases = [
-            {"id": "c01", "title": "Inside information & delay", "questions": ["Question 1", "Question 2"]},
-            {"id": "c02", "title": "Prospectus liability", "questions": ["Question 1"]},
-        ]
-        case_titles = [c["title"] for c in cases]
+        # Use real cases from CASES
+        case_titles = [c.get("title", c.get("id", "Untitled case")) for c in CASES]
         sel_case_title = st.selectbox("Select exam case", case_titles, index=0)
-        sel_case = next(c for c in cases if c["title"] == sel_case_title)
-        q_label = st.selectbox("Select question", sel_case["questions"], index=0)
-
-        # 2) Exam question text (replace with real text from your private model-answers JSON later)
-        st.markdown("**Exam question**")
-        st.info("Describe the concept of inside information under MAR and discuss if delay is permissible.")
-
-        # 3) Mode radio (your three tasks)
+        sel_case = next(c for c in CASES if c.get("title", c.get("id")) == sel_case_title)
+        
+        # Show the full case description (which already contains the numbered questions)
+        st.markdown("**Case description**")
+        st.write(sel_case.get("description", "—"))
+        
+        # Let the user pick which question number they are answering
+        q_count = int(sel_case.get("question_count", 1))
+        q_labels = [f"Question {i+1}" for i in range(max(1, q_count))]
+        q_label  = st.selectbox("Which question are you answering?", q_labels, index=0)
+        q_index  = q_labels.index(q_label)
+        
+        # Your existing 'Task' radio stays the same
         mode = st.radio("Task", ["Plan", "Evaluate", "Follow‑up"], horizontal=True)
-
-        # 4) Inputs
+        
+        # Inputs (keep exactly as you had them)
         ans = st.text_area(
             "Student answer (paste or write here)",
             height=220,
-            key=f"answer::{_key(sel_case['id'], q_label)}"
+            key=f"answer::{sel_case.get('id','unknown')}::{q_label}"
         )
-
+        
+        run = st.button("Run task", type="primary")
+        
         # Model answer slice (authoritative) — later replace with a lookup from your private JSON
         with st.expander("Model answer slice (authoritative) — paste or load later", expanded=(mode == "Evaluate")):
             model_answer_slice = st.text_area(
@@ -115,7 +116,7 @@ with tab_feedback:
                 else:
                     with st.spinner("Planning..."):
                         plan = feedback_engine.plan_answer(
-                            case_text=f"[{sel_case['title']}] (placeholder case text)",
+                            case_text=sel_case.get("description", f"[{sel_case['title']}]"),
                             question=q_label,
                             model=model,
                             temperature=temp
@@ -129,24 +130,28 @@ with tab_feedback:
                     last = st.session_state["feedback_store"][storage_key]
 
             elif mode == "Evaluate":
-                if not model_answer_slice.strip() or not ans.strip():
-                    st.warning("Please paste both model answer slice and student answer.")
+                # Prefer JSON slice; fall back to the textarea if provided
+                sections = sel_case.get("model_answer_sections") or []
+                auto_slice = sections[q_index] if (0 <= q_index < len(sections)) else None
+                
+                effective_model_answer = (auto_slice or model_answer_slice or "").strip()
+                if not effective_model_answer or not ans.strip():
+                    st.warning("Missing model answer slice (JSON or pasted) or student answer.")
                 else:
                     with st.spinner("Evaluating..."):
                         fb = feedback_engine.evaluate_answer(
                             student_answer=ans,
-                            model_answer=model_answer_slice,
+                            model_answer=effective_model_answer,
                             model=model,
                             temperature=temp
                         )
                     st.session_state.setdefault("feedback_store", {})
-                    st.session_state["feedback_store"][storage_key] = {
+                    st.session_state["feedback_store"][f"{sel_case.get('id','unknown')}::{q_label}"] = {
                         "mode": "Evaluate",
                         "answer": ans,
                         "feedback": fb
                     }
-                    last = st.session_state["feedback_store"][storage_key]
-
+    
             elif mode == "Follow‑up":
                 if not last or not last.get("feedback"):
                     st.warning("No previous feedback found for this case/question. Run **Evaluate** first.")
