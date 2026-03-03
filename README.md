@@ -98,8 +98,8 @@ This allows swapping Groq, OpenRouter, or local models without changing engines.
 groq.py
 Concrete implementation for Groq’s Llama models.
 
-rag/
-index.py
+### **rag/**
+#### `index.py`
 Builds and stores the semantic index of booklet chunks:
 
 chunking
@@ -107,14 +107,14 @@ embeddings
 metadata
 caching
 
-filters.py
+#### `filters.py`
 Pre‑retrieval keyword and heuristic filtering:
 
 case numbers
 paragraph numbers
 legal references (MAR, PR, §33 WpHG, etc.)
 
-retrieve.py
+#### `retrieve.py`
 Combines:
 
 semantic similarity
@@ -124,23 +124,22 @@ snippet grouping
 
 Used by both engines with different settings.
 
-booklet/
-parse.py
+### **booklet/**
+#### `parse.py`
 Reads the course booklet DOCX file and outputs:
 
 text chunks
 metadata
 case/paragraph anchors
 
-anchors.py
+#### `anchors.py`
 Utility functions:
 
 detect “Case Study 30”
 detect “para. 115”
 handle citation strings
 
-
-core.py
+#### `core.py`
 Shared utilities:
 
 keyword extraction
@@ -151,7 +150,7 @@ truncation helpers
 
 Simple, reusable functions with no Streamlit or LLM dependencies.
 
-prompts.py
+#### `prompts.py`
 Contains two distinct prompt sets:
 
 
