@@ -37,6 +37,9 @@ Reusable modules used by both engines:
 ### **3. UI layer**
 A thin Streamlit UI (`streamlit_app.py`) calling into the engines.
 
+### **4. Assets**
+Assets (e.g., course booklet, sample cases, model answers) will be sitting in a private repo.
+
 ---
 
 ## 📁 Repository Structure
