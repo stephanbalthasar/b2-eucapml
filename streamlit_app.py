@@ -67,6 +67,7 @@ with tab_feedback:
         case_titles = [c.get("title", c.get("id", "Untitled case")) for c in CASES]
         sel_case_title = st.selectbox("Select exam case", case_titles, index=0)
         sel_case = next(c for c in CASES if c.get("title", c.get("id")) == sel_case_title)
+        sel_case_id = sel_case.get("id", "unknown")
         
         # Show the full case description (which already contains the numbered questions)
         st.markdown("**Case description**")
@@ -99,7 +100,11 @@ with tab_feedback:
             )
 
         # 5) Action
-        run = st.button("Run task", type="primary")
+        run = st.button(
+            "Run task",
+            type="primary",
+            key=f"run_btn::{sel_case_id}::{q_index}::{mode}"   # <-- unique per case/question/mode
+        )
 
     # --- (B) RIGHT: output stays on screen + download buttons ---
     with right:
