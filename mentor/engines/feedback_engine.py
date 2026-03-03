@@ -1,23 +1,33 @@
 # mentor/engines/feedback_engine.py
+from mentor.prompts import (
+    build_evaluate_messages,
+    build_consistency_rewrite_messages,
+    build_plan_messages,
+    build_followup_messages,
+)
 
 class FeedbackEngine:
     def __init__(self, llm):
         self.llm = llm
 
     # -------------------------------------------------------
-    # (i) Help student plan an answer
+    # (i) PLAN  ---- CHANGED SIGNATURE ----
     # -------------------------------------------------------
-    def plan_answer(self, *, case_text, question, model, temperature):
-        messages = [
-            {"role": "system", "content": "You help students plan structured exam answers."},
-            {"role": "user", "content": f"CASE:\n{case_text}\n\nQUESTION:\n{question}\n\nHelp me plan my answer."}
-        ]
-        return self.llm.chat(
-            messages=messages,
-            model=model,
-            temperature=temperature,
-            max_tokens=800
+    def plan_answer(self, *,
+                    case_text: str,
+                    question: str,
+                    model_answer_slice: str | None,
+                    booklet_text: str | None,
+                    model: str,
+                    temperature: float) -> str:
+        messages = build_plan_messages(
+            case_text=case_text,
+            question_label=question,
+            model_answer_slice=model_answer_slice,
+            booklet_text=booklet_text
         )
+        # For planning, prefer tight settings
+        return self.llm.chat(messages=messages, model=model, temperature=min(temperature, 0.2), max_tokens=750)
 
     # -------------------------------------------------------
     # (ii) Evaluate a submitted answer
