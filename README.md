@@ -38,6 +38,7 @@ A thin Streamlit UI (`streamlit_app.py`) calling into the engines.
 ---
 
 ## 📁 Repository Structure
+```text
 eucapml-mentor/
 ├── streamlit_app.py         # Streamlit UI wrapper
 ├── README.md
