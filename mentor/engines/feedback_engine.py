@@ -30,20 +30,24 @@ class FeedbackEngine:
         return self.llm.chat(messages=messages, model=model, temperature=min(temperature, 0.2), max_tokens=350)
 
     # -------------------------------------------------------
-    # (ii) Evaluate a submitted answer
+    # (ii) Evaluate a submitted answer  — use the prompt builder
     # -------------------------------------------------------
-    def evaluate_answer(self, *, student_answer, model_answer, model, temperature):
-        messages = [
-            {"role": "system", "content": "You compare the student's answer to the authoritative model answer."},
-            {"role": "user", "content":
-                f"MODEL ANSWER:\n{model_answer}\n\nSTUDENT ANSWER:\n{student_answer}\n\nGive structured feedback."}
-        ]
-        return self.llm.chat(
+    def evaluate_answer(self, *, student_answer, model_answer, model, temperature, max_words=300):
+        # Build the structured, five‑heading prompt with a word ceiling
+        messages = build_evaluate_messages(
+            student_answer=student_answer,
+            model_answer=model_answer,
+            max_words=max_words
+        )
+        # Optional one‑time fingerprint for debugging which path runs:
+        # messages.insert(0, {"role": "system", "content": "[EVAL_PATH=v2]"})
+        raw = self.llm.chat(
             messages=messages,
             model=model,
             temperature=temperature,
-            max_tokens=1500
+            max_tokens=900  # generous but bounded; headings + content fit comfortably
         )
+        return raw if isinstance(raw, str) else str(raw)
 
     # -------------------------------------------------------
     # (iii) Follow-up questions about the feedback
