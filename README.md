@@ -49,25 +49,25 @@ eucapml-mentor/
 ├── README.md
 ├── requirements.txt
 └── mentor/
-├── engines/
-│   ├── feedback_engine.py    Exam-style evaluator: plan/evaluate/explain
-│   └── chat_engine.py       # RAG-based tutor
-│
-├── rag/
-│   ├── index.py             # Build and store booklet embeddings
-│   ├── retrieve.py          # Query → relevant snippets
-│   └── filters.py           # Keyword & heuristic narrowing
-│
-├── llm/
-│   ├── client.py            # Model-agnostic LLM interface
-│   └── groq.py              # Groq implementation
-│
-├── booklet/
-│   ├── parse.py             # Parse DOCX booklet into chunks
-│   └── anchors.py           # Detect paras, cases, sections
-│
-├── core.py                  # Shared utilities
-└── prompts.py               # Prompt templates for both engines
+    ├── engines/
+    │   ├── feedback_engine.py    Exam-style evaluator: plan/evaluate/explain
+    │   └── chat_engine.py       # RAG-based tutor
+    │
+    ├── rag/
+    │   ├── index.py             # Build and store booklet embeddings
+    │   ├── retrieve.py          # Query → relevant snippets
+    │   └── filters.py           # Keyword & heuristic narrowing
+    │
+    ├── llm/
+    │   ├── client.py            # Model-agnostic LLM interface
+    │   └── groq.py              # Groq implementation
+    │
+    ├── booklet/
+    │   ├── parse.py             # Parse DOCX booklet into chunks
+    │   └── anchors.py           # Detect paras, cases, sections
+    │
+    ├── core.py                  # Shared utilities
+    └── prompts.py               # Prompt templates for both engines
 ```
 ---
 
