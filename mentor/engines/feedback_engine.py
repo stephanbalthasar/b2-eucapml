@@ -27,7 +27,7 @@ class FeedbackEngine:
             booklet_text=booklet_text
         )
         # For planning, prefer tight settings
-        return self.llm.chat(messages=messages, model=model, temperature=min(temperature, 0.2), max_tokens=750)
+        return self.llm.chat(messages=messages, model=model, temperature=min(temperature, 0.2), max_tokens=350)
 
     # -------------------------------------------------------
     # (ii) Evaluate a submitted answer
