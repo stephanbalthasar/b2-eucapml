@@ -13,6 +13,7 @@ def build_evaluate_messages(student_answer: str, model_answer: str,
         "Do NOT disclose the model answer text. If the student conflicts with it, state the correct "
         "conclusion succinctly and explain briefly why.\n"
         "Do NOT invent legal citations or paragraph numbers. No footnotes. No web sources.\n"
+        "Do NOT assign grades, scores, marks etc., provide qualitative feedback only.\n"
         f"Write clearly, ≤ {max_words} words, using the exact five headings below."
     )
     user = (
