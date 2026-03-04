@@ -80,41 +80,55 @@ def render_flat_navy_hero(
     st.markdown("")  # small spacing after hero
 
 def render_sticky_footer():
+    import streamlit as st
     st.markdown(
         """
-<style>
-.stApp { padding-bottom: 64px; }
-section.main > div { padding-bottom: 64px; }
-.eucapml-fixed-footer {
-  position: fixed; left: 0; right: 0; bottom: 0;
-  z-index: 99999;
-  background: #0e1117; color: rgba(255,255,255,.92);
-  border-top: 1px solid rgba(255,255,255,.12);
-  padding: .70rem 1rem; font-size: .92rem; line-height: 1.35rem;
-}
-.eucapml-fixed-footer .inner {
-  max-width: 1200px; margin: 0 auto;
-  display: flex; gap: .75rem; align-items: center; flex-wrap: wrap;
-}
-.eucapml-fixed-footer .spacer { flex: 1; }
-.eucapml-fixed-footer a.btn {
-  display: inline-block; background: #1a73e8; color: #fff !important;
-  padding: .35rem .75rem; border-radius: 6px; font-weight: 600; text-decoration: none;
-}
-.eucapml-fixed-footer a.btn:hover { background: #165fc1; }
-</style>
-<div class="eucapml-fixed-footer" role="contentinfo" aria-label="Legal note and privacy">
-  <div class="inner">
-    <span>
-      ℹ️ <strong>Notes</strong>:
-      (c) 2026 by Stephan Balthasar. This app uses AI & LLMs. Output may be inaccurate, and no liability is accepted.
-      App feedback is no indicator for grades in a real examination.
-    </span>
-    <span class="spacer"></span>
-    <a class="btn" href="?show_privacy=1" title="View AI & Privacy Notice">AI & Privacy Notice</a>
-  </div>
-</div>
-""",
+        <style>
+          /* --- Sticky, single-line footer --- */
+          .sb-sticky-foot{
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: #ffffff;
+            border-top: 1px solid #E7EAF0;
+            box-shadow: 0 -2px 8px rgba(5,16,28,0.06);
+            z-index: 9999;
+          }
+          .sb-sticky-foot .sb-inner{
+            max-width: 1120px;      /* keep in sync with your page cap (1080–1120px) */
+            margin: 0 auto;
+            display: flex; align-items: center;
+            gap: 12px; padding: 8px 12px;
+            white-space: nowrap;    /* keep it on a single visual line */
+          }
+          /* Left-side button */
+          .sb-foot-btn{
+            display: inline-block;
+            background: #123B7A; color: #fff !important;
+            border: 1px solid #123B7A;
+            padding: 6px 12px; border-radius: 999px;
+            text-decoration: none; font-weight: 600; font-size: 0.9rem;
+          }
+          .sb-foot-btn:hover{ background:#0F2D5A; border-color:#0F2D5A; }
+
+          /* Right-side info text (truncates gracefully on small screens) */
+          .sb-footnote{
+            color: #5B677A; font-size: 0.9rem;
+            overflow: hidden; text-overflow: ellipsis;
+          }
+
+          /* Ensure page content isn't hidden behind the sticky footer */
+          .block-container{ padding-bottom: 64px !important; }
+        </style>
+
+        <div class="sb-sticky-foot">
+          <div class="sb-inner">
+            ?show_privacy=1AI &amp; Privacy Notice</a>
+            <div class="sb-footnote">
+              © 2026 Stephan Balthasar · This app uses AI &amp; LLMs; outputs may be inaccurate; no liability.
+              Feedback is not a grade predictor.
+            </div>
+          </div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
