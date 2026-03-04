@@ -50,25 +50,25 @@ class FeedbackEngine:
     # -------------------------------------------------------
     
     def follow_up_with_history(self, question, context, model, temperature):
-    messages = []
-
-    # Inject core context
-    messages.append({"role": "system", "content": f"Student exam answer:\n{context['student_answer']}"})
-    messages.append({"role": "system", "content": f"Feedback:\n{context['feedback']}"})
-
-    # Prior chat turns
-    for role, msg in context["history"]:
-        messages.append({
-            "role": "user" if role == "student" else "assistant",
-            "content": msg
-        })
-
-    # Current question
-    messages.append({"role": "user", "content": question})
-
-    # LLM call
-    return self.llm.chat(
-        messages,
-        model=model,
-        temperature=temperature
-    )
+        messages = []
+    
+        # Inject core context
+        messages.append({"role": "system", "content": f"Student exam answer:\n{context['student_answer']}"})
+        messages.append({"role": "system", "content": f"Feedback:\n{context['feedback']}"})
+    
+        # Prior chat turns
+        for role, msg in context["history"]:
+            messages.append({
+                "role": "user" if role == "student" else "assistant",
+                "content": msg
+            })
+    
+        # Current question
+        messages.append({"role": "user", "content": question})
+    
+        # LLM call
+        return self.llm.chat(
+            messages,
+            model=model,
+            temperature=temperature
+        )
