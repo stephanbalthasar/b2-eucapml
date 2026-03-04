@@ -285,31 +285,17 @@ if not st.session_state.authenticated:
     # Stop rendering the rest of the app until authenticated
     st.stop()
 
-# Hint chip: show only when the sidebar is collapsed (authenticated pages)
-# Hint chip: show only when the sidebar is collapsed (authenticated pages)
+# Hint chip: shows only when the sidebar is collapsed (authenticated pages)
 st.markdown(
     """
     <style>
-      /* Keep these in sync with your global width cap */
+      /* Keep these in sync with your global page cap */
       :root{
-        --content-max: 1120px;  /* set to your chosen cap: 1080–1120px */
+        --content-max: 1120px;   /* set to your chosen cap: 1080–1120px */
         --page-pad: 12px;
       }
 
-      /* Default: hide the hint */
-      .sb-sidebar-hint{ display: none; }
-
-      /* Show hint when sidebar is collapsed (robust selector) */
-      [data-testid="stSidebar"][aria-expanded="false"] ~ * .sb-sidebar-hint{
-        display: inline-flex;
-      }
-
-      /* Hide hint when sidebar is visible */
-      [data-testid="stSidebar"][aria-expanded="true"] ~ * .sb-sidebar-hint{
-        display: none;
-      }
-
-      /* Hint styling + alignment with main content left edge */
+      /* Position and style the hint */
       .sb-sidebar-hint{
         position: fixed;
         top: 10px;
@@ -321,9 +307,20 @@ st.markdown(
         box-shadow: 0 2px 8px rgba(5,16,28,0.15);
         user-select: none; cursor: default;
         white-space: nowrap;
+        display: none; /* default hidden; CSS below will toggle it */
       }
 
-      /* Small screens: pin a little closer to the edge */
+      /* --- Toggle logic (pure CSS) ---
+         Show the hint only when the Streamlit sidebar is present but collapsed.
+         We use :has() for robustness across DOM variations. */
+      body:has([data-testid="stSidebar"][aria-expanded="false"]) .sb-sidebar-hint{
+        display: inline-flex;
+      }
+      body:has([data-testid="stSidebar"][aria-expanded="true"]) .sb-sidebar-hint{
+        display: none;
+      }
+
+      /* Small screens: pin closer to the edge */
       @media (max-width: 900px){
         .sb-sidebar-hint{ left: 10px; }
       }
