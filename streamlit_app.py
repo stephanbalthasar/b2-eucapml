@@ -414,18 +414,7 @@ with tab_chat:
         if not q.strip():
             st.warning("Please enter a question.")
         else:
-            with st.spinner("Thinking..."):           
-                best = chap_retriever.retrieve_best(q)  # existing selector
-                ch_title = (best.get("title") or f"Chapter {best.get('chapter_num', '—')}") if isinstance(best, dict) else None
-                excerpt  = ((best.get("text") or "").strip()[:3200]) if isinstance(best, dict) else ""
-            
+            with st.spinner("Thinking..."):
                 chosen_model = "llama-3.3-70b-versatile" if model != "llama-3.3-70b-versatile" else model
-                reply = chat_engine.answer_with_booklet_excerpt(
-                    user_question=q,
-                    excerpt=excerpt,
-                    chapter_title=ch_title,
-                    model=chosen_model,
-                    temperature=0.0,
-                    max_tokens=800,
-                )
+                reply = chat_engine.answer(q, model=chosen_model, temperature=0.0, max_tokens=800)
             st.markdown(reply)
