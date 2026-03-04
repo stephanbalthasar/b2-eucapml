@@ -414,20 +414,18 @@ with tab_chat:
         if not q.strip():
             st.warning("Please enter a question.")
         else:
-            with st.spinner("Thinking..."):
-                # AFTER
-                best = chap_retriever.retrieve_best(q)  # uses keyword overlap or embeddings if configured
-                ch_title = None
-                excerpt  = ""
-                
-                if isinstance(best, dict):
-                    ch_title = best.get("title") or f"Chapter {best.get('chapter_num', '—')}"
-                    ch_text  = (best.get("text") or "").strip()
-                    excerpt  = ch_text[:3200] if ch_text else ""
-                
-                prompt = build_tutor_chat_prompt_booklet_only(excerpt, q, ch_title)
-                
-                # Keep chat conservative to avoid drift; prefer 70B at temp 0.0 for legal topics
+            with st.spinner("Thinking..."):           
+                best = chap_retriever.retrieve_best(q)  # existing selector
+                ch_title = (best.get("title") or f"Chapter {best.get('chapter_num', '—')}") if isinstance(best, dict) else None
+                excerpt  = ((best.get("text") or "").strip()[:3200]) if isinstance(best, dict) else ""
+            
                 chosen_model = "llama-3.3-70b-versatile" if model != "llama-3.3-70b-versatile" else model
-                reply = chat_engine.answer(prompt, model=chosen_model, temperature=0.0, max_tokens=800)
+                reply = chat_engine.answer_with_booklet_excerpt(
+                    user_question=q,
+                    excerpt=excerpt,
+                    chapter_title=ch_title,
+                    model=chosen_model,
+                    temperature=0.0,
+                    max_tokens=800,
+                )
             st.markdown(reply)
