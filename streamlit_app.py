@@ -231,8 +231,6 @@ if "role" not in st.session_state:
 
 # === PATCH 3: login gate ===
 if not st.session_state.authenticated:
-    # === LOGIN GATE ===
-if not st.session_state.authenticated:
     # Flat navy hero (no CTAs here)
     render_flat_navy_hero(
         title="European Capital Markets Law - Digital Mentor",
