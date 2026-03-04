@@ -18,83 +18,65 @@ def render_flat_navy_hero(
     st.markdown(
         """
         <style>
-            /* Constrain main content width a bit for a premium feel (can tweak later) */
+            /* Constrain page width for a premium feel */
             .main > div { max-width: 1120px; margin: 0 auto; }
 
-            /* Flat navy hero container */
+            /* Flat navy hero */
             .sb-hero {
                 background: #0B1F3B;           /* flat navy */
                 color: #ffffff;
                 border-radius: 14px;
-                padding: 24px 22px;
-                box-shadow: 0 6px 24px rgba(1,20,40,0.25);
-                display: flex;
-                gap: 18px;
-                align-items: center;
+                padding: 28px 24px;
+                box-shadow: 0 8px 24px rgba(5,16,28,0.18);
             }
-            .sb-hero .sb-hero-text h1 {
-                font-weight: 700;
-                margin: 0 0 6px 0;
-                font-size: 2.0rem;             /* we can refine sizes later */
-                line-height: 1.2;
+            .sb-hero-inner {
+                display: flex; align-items: center; gap: 18px;
             }
-            .sb-hero .sb-hero-text p {
-                margin: 0;
-                font-size: 1.05rem;
-                opacity: 0.92;
+            .sb-hero h1 {
+                font-weight: 700; margin: 0 0 8px 0;
+                font-size: 2.25rem; line-height: 1.2;
+                letter-spacing: -0.2px;
             }
-            .sb-hero .sb-hero-strap {
-                margin-top: 6px;
-                font-size: 0.85rem;
-                opacity: 0.80;
+            .sb-hero p {
+                margin: 0; font-size: 1.125rem;
+                line-height: 1.35; opacity: 0.92;
             }
             .sb-hero .sb-logo {
                 flex: 0 0 auto;
-                border-radius: 10px;
-                overflow: hidden;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 120px; height: 120px;
-                background: rgba(255,255,255,0.06);
-                border: 1px solid rgba(255,255,255,0.10);
+                display: flex; align-items: center; justify-content: center;
+                width: 100px; height: 100px;
             }
+            .sb-hero .sb-logo img { width: 100%; height: auto; }
             @media (max-width: 800px) {
-                .sb-hero { flex-direction: column; align-items: flex-start; }
-                .sb-hero .sb-logo { width: 90px; height: 90px; }
+                .sb-hero-inner { flex-direction: column; align-items: flex-start; }
+                .sb-hero .sb-logo { width: 84px; height: 84px; }
             }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-    # Layout
-    cols = st.columns([1, 3], gap="small")
-    with cols[0]:
-        if logo_path:
-            try:
-                st.markdown('<div class="sb-logo">', unsafe_allow_html=True)
-                st.image(logo_path, use_column_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            except Exception:
-                st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
-
-    with cols[1]:
-        st.markdown('<div class="sb-hero">', unsafe_allow_html=True)
-        st.markdown(
-            f"""
-            <div class="sb-hero-text">
-                <h1>{title}</h1>
-                <p>{subtitle}</p>
-                <div class="sb-hero-strap">Grounded in the course booklet and public sources (EUR‑Lex, CURIA, ESMA, BaFin).</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-
+    # Render hero block
+    st.markdown('<div class="sb-hero">', unsafe_allow_html=True)
+    st.markdown('<div class="sb-hero-inner">', unsafe_allow_html=True)
+    if logo_path:
+        try:
+            st.markdown('<div class="sb-logo">', unsafe_allow_html=True)
+            st.image(logo_path, use_column_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        except Exception:
+            pass
+    st.markdown(
+        f"""
+        <div class="sb-hero-text">
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.markdown('</div>', unsafe_allow_html=True)   # /sb-hero-inner
+    st.markdown('</div>', unsafe_allow_html=True)   # /sb-hero
     st.markdown("")  # small spacing after hero
 
 def render_sticky_footer():
