@@ -68,7 +68,7 @@ class FeedbackEngine:
     
         # LLM call
         return self.llm.chat(
-            messages,
+            messages=messages,
             model=model,
             temperature=temperature
         )
