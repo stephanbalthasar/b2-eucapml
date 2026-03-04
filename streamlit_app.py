@@ -200,6 +200,16 @@ from mentor.engines.feedback_engine import FeedbackEngine
 from mentor.llm.groq import GroqClient
 
 st.set_page_config(page_title="EUCapML Mentor", page_icon="⚖️", layout="wide")
+# Global width cap for a professional look (applies to all pages)
+st.markdown("""
+<style>
+  /* Constrain the main content and center it */
+  .block-container, section.main > div {
+    max-width: 1120px !important;   /* pick 1040–1160px if you prefer */
+    margin: 0 auto !important;
+  }
+</style>
+""", unsafe_allow_html=True)
 
 # === PATCH 2: always-on footer and optional overlay ===
 render_privacy_overlay_if_requested()
@@ -213,6 +223,29 @@ if "role" not in st.session_state:
 
 # === PATCH 3: login gate ===
 if not st.session_state.authenticated:
+    # Compact app name bar (authenticated pages only)
+    st.markdown("""
+    <style>
+      .appbar {
+        background: #F6F8FC;
+        color: #0B1F3B;
+        border: 1px solid #E7EAF0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-weight: 600;
+        margin: 6px 0 12px 0;
+      }
+    </style>
+    <div class="appbar">European Capital Markets Law – Digital Mentor</div>
+    """, unsafe_allow_html=True)
+    # Hide the sidebar on the landing page only
+    st.markdown("""
+    <style>
+      div[data-testid="stSidebar"] { display: none !important; }
+      /* Slightly tighten top/bottom padding while the sidebar is hidden */
+      .block-container { padding-top: 0.75rem !important; padding-bottom: 2rem !important; }
+    </style>
+    """, unsafe_allow_html=True)
     # Flat navy hero (no CTAs here)
     render_flat_navy_hero(
         title="European Capital Markets Law - Digital Mentor",
@@ -252,9 +285,6 @@ if not st.session_state.authenticated:
     # Stop rendering the rest of the app until authenticated
     st.stop()
 
-# Optional tiny banner (remove once you’re confident)
-st.caption(f"📖 Booklet loaded — {len(INDEX['chapters'])} chapters, {len(INDEX['paragraphs'])} numbered paragraphs.")
-
 # --- Build retrievers once ---
 para_retriever = ParagraphRetriever(INDEX["paragraphs"])
 chap_retriever = ChapterRetriever(INDEX["chapters"])
@@ -277,6 +307,7 @@ feedback_engine = FeedbackEngine(llm=llm)
 
 # --- Sidebar controls ---
 with st.sidebar:
+    st.caption(f"📖 Booklet loaded — {len(INDEX['chapters'])} chapters / {len(INDEX['paragraphs'])} paragraphs")
     model = st.selectbox("Model", ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"], index=0)
     temp  = st.slider("Temperature", 0.0, 1.0, 0.2, 0.05)
     if st.button("Reload booklet index (server cache)"):
