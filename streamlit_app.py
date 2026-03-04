@@ -223,21 +223,6 @@ if "role" not in st.session_state:
 
 # === PATCH 3: login gate ===
 if not st.session_state.authenticated:
-    # Compact app name bar (authenticated pages only)
-    st.markdown("""
-    <style>
-      .appbar {
-        background: #F6F8FC;
-        color: #0B1F3B;
-        border: 1px solid #E7EAF0;
-        border-radius: 10px;
-        padding: 10px 12px;
-        font-weight: 600;
-        margin: 6px 0 12px 0;
-      }
-    </style>
-    <div class="appbar">European Capital Markets Law – Digital Mentor</div>
-    """, unsafe_allow_html=True)
     # Hide the sidebar on the landing page only
     st.markdown("""
     <style>
@@ -284,6 +269,22 @@ if not st.session_state.authenticated:
 
     # Stop rendering the rest of the app until authenticated
     st.stop()
+
+    # Compact app name bar (authenticated pages only)
+    st.markdown("""
+    <style>
+      .appbar {
+        background: #F6F8FC;
+        color: #0B1F3B;
+        border: 1px solid #E7EAF0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-weight: 600;
+        margin: 6px 0 12px 0;
+      }
+    </style>
+    <div class="appbar">European Capital Markets Law – Digital Mentor</div>
+    """, unsafe_allow_html=True)
 
 # --- Build retrievers once ---
 para_retriever = ParagraphRetriever(INDEX["paragraphs"])
