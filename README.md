@@ -217,4 +217,59 @@ TBD.
 ### **👤 Author**
 Stephan Balthasar (Allianz SE)
 
+### Improvement proposals by M365 Copilot (4 Mar 2026)
+1) Make the evaluator deterministic, grounded, and verifiable
+Right now the “Evaluate” path returns free‑form markdown from the LLM. Tighten this into a structured, grounded pipeline so students get consistent results and you can audit outcomes.
+What to do
+
+Structured JSON output: Have FeedbackEngine.evaluate_answer() ask the model for a JSON object (overall_assessment, rubric_scores, missing_issues, citations, action_items). Parse/validate it before rendering markdown. This prevents “wandering” feedback and makes it testable. [allianzms-...epoint.com]
+Rubric with weights: Encode your exam criteria (issue spotting, legal basis, application, structure, conclusions) with weights; compute a composite score locally and render a clean panel from the JSON. [allianzms-...epoint.com]
+RAG grounding for Evaluate: You already have a booklet index and retrievers; use them to anchor Evaluate with 3–6 snippets per question, not just the model answer slice. Show inline citations (“MAR Art. 7(1) / Booklet §2.3”) and links to the trusted EU/DE sources you listed for the tutor engine (EUR‑Lex, CURIA, BaFin, etc.). It aligns with your architecture where the RAG subsystem is shared between engines. [allianzms-...epoint.com]
+Guardrails: If JSON parsing fails, retry once with a “you produced invalid JSON—fix it” system message; if still invalid, fall back to a clearly labeled “Unstructured feedback” box.
+
+Why it matters
+
+Students get consistent, comparable feedback.
+You gain explainability, which is critical in legal education.
+You can add unit tests for the evaluator without mocking markdown. [allianzms-...epoint.com]
+
+
+2) Persistence, IDs, and audit trails (per case/question attempt)
+You’ve got session‑based state for answers, feedback, and chat; add lightweight persistence so a student can resume later, and you get a log book for course analytics—without storing personal data.
+What to do
+
+Attempt IDs: On each evaluation, generate a run_id like caseId:question:timestamp. Store {run_id, case_id, q_index, answer, feedback, chat_history, model, temperature} in a tiny local store (JSON or SQLite). Add “Continue last attempt” and “Start new attempt” buttons on the Evaluate screen. [allianzms-...epoint.com]
+PIN or pseudonymous tag: If you later re‑enable the PIN concept, namespace attempts by PIN without collecting personal data. (You previously wanted a log book of submissions; this completes that story.)
+Export with metadata: Your .docx export works—great. Move the make_docx() helper out of the UI into a small utils/exports.py, and include metadata (case title, question, run_id, model, temperature, timestamp). Offer PDF as an opt‑in (use reportlab) once stable. [allianzms-...epoint.com]
+Recovery UX: On app reload, detect unfinished attempts in st.session_state / local store and offer to restore the last run’s answer/feedback/chat into the screen automatically. [allianzms-...epoint.com]
+
+Why it matters
+
+Students don’t lose work; you get traceability.
+Clean separation of concerns: UI ↔ engines ↔ persistence.
+Sets you up for anonymized course analytics (e.g., common missing issues per question).
+
+
+3) Polish the student UX for long-form answers
+You already switched to a single‑column flow—nice. Now make the writing and review experience excellent for exam‑length answers.
+What to do
+
+Better editor ergonomics: add word/character counts, a “time spent” indicator, and optional autosave every 10–15 seconds (just to session/local store). Add keyboard shortcuts (Ctrl/Cmd+Enter to Evaluate; Enter to send in chat). [allianzms-...epoint.com]
+Stable layout: Keep the case description in an expander (“Show/Hide case”), and render the submitted answer & feedback in collapsible sections with sticky subheadings. This avoids vertical jumps on re‑runs. [allianzms-...epoint.com]
+Streaming replies (optional): Stream the LLM output in both Evaluate (for the long feedback block) and follow‑up chat, so students see progress on slower models. (Your Groq client likely supports streaming; expose it through the LLMClient.) [allianzms-...epoint.com]
+Consistent state keys: You already tripped over mixed keys earlier. Normalize to a single helper like _key(case_id, q_index) and reuse it for answer, feedback, chat, and downloads. This prevents “missing output after re‑run” surprises. [allianzms-...epoint.com]
+Error UX: Replace raw exceptions with friendly toasts (e.g., “Model is busy, retrying…”) and auto‑retry once on transient errors; log details server‑side.
+
+Why it matters
+
+Students focus on legal reasoning, not UI friction.
+Fewer support pings from “my text disappeared” or “nothing happens when I click.”
+
+
+Bonus quick wins (low effort, high payoff)
+
+Centralize constants (default temperature, max_tokens, model names) in one settings.py. You already pass these around in multiple places. [allianzms-...epoint.com]
+Module hygiene: Move inline helpers like make_docx() into a utilities module; keep the Streamlit file a thin orchestrator. [allianzms-...epoint.com]
+Tests: Add a tiny tests/ suite for: model‑slice selection by q_index, JSON schema validation of evaluator output, and RAG retrieval sanity checks. Your README already outlines a testing strategy—use it. [allianzms-...epoint.com]
+
 End of README.md
