@@ -351,21 +351,24 @@ with tab_feedback:
     sel_case = next(c for c in CASES if c.get("title", c.get("id")) == sel_case_title)
     sel_case_id = sel_case.get("id", "unknown")
 
-    q_count = int(sel_case.get("question_count", 1))
-    q_labels = [f"Question {i+1}" for i in range(max(1, q_count))]
-    q_label = st.selectbox("Which question are you working on?", q_labels, index=0)
-    q_index = q_labels.index(q_label)
-
     # -----------------------------
     # 2. CASE DESCRIPTION
     # -----------------------------
     st.markdown("### Case description")
     st.write(sel_case.get("description", "—"))
 
-    st.divider()
-
     # -----------------------------
-    # 3. WORKFLOW CHOICE
+    # 3. QUESTION SELECTION
+    # -----------------------------
+    q_count = int(sel_case.get("question_count", 1))
+    q_labels = [f"Question {i+1}" for i in range(max(1, q_count))]
+    q_label = st.selectbox("Which question are you working on?", q_labels, index=0)
+    q_index = q_labels.index(q_label)
+
+    st.divider()
+    
+    # -----------------------------
+    # 4. WORKFLOW CHOICE
     # -----------------------------
     workflow = st.radio(
         "Choose your workflow:",
