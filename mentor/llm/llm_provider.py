@@ -1,10 +1,30 @@
 # mentor/llm/llm_provider.py
 from typing import List, Dict, Optional, Tuple
+import os
 
 # ✅ Flat layout: all these files live in mentor/llm/
 from .openrouter import OpenRouterClient
 from .groq import GroqClient
 from .llm_registry import get_default_model, get_model_registry, ModelInfo
+
+# Streamlit secrets are available in Cloud runtime; guard the import for tests
+try:
+    import streamlit as st
+    _SECRETS = st.secrets
+except Exception:
+    _SECRETS = {}
+
+def _get(key: str, default: str = "") -> str:
+    # Prefer env (for Docker/CI), then Streamlit secrets
+    return os.getenv(key) or _SECRETS.get(key, default)
+
+
+class _UnavailableClient:
+    """Minimal stub used when a provider cannot be initialized."""
+    is_configured: bool = False
+
+    def complete(self, *args, **kwargs):
+        raise RuntimeError("Selected provider is not configured.")
 
 
 class LLMProvider:
@@ -18,10 +38,28 @@ class LLMProvider:
     """
 
     def __init__(self):
-        # Instantiate provider clients (they read keys from st.secrets / env)
+        # --- OpenRouter (Qwen default) ---
+        # Your OpenRouterClient already reads keys/settings from secrets/env.
         self._openrouter = OpenRouterClient()
-        self._groq = GroqClient()
-        self._default = get_default_model()  # comes from llm_registry.py
+
+        # --- Groq (Llama) ---
+        # Your groq.py requires an api_key positional arg, so fetch it now.
+        groq_key = _get("GROQ_API_KEY", "")
+        self._groq_key = groq_key  # keep for is_available fallback logic
+        if groq_key:
+            try:
+                self._groq = GroqClient(api_key=groq_key)
+            except TypeError:
+                # In case your GroqClient signature changed, try no-arg init (best effort)
+                try:
+                    self._groq = GroqClient()
+                except Exception:
+                    self._groq = _UnavailableClient()
+        else:
+            self._groq = _UnavailableClient()
+
+        # Registry default (should point to OpenRouter/Qwen)
+        self._default = get_default_model()
 
     # ----- Model registry -----
     def list_models(self) -> Tuple[ModelInfo, Dict[str, List[ModelInfo]]]:
@@ -38,9 +76,21 @@ class LLMProvider:
 
     def is_available(self, provider: str) -> bool:
         try:
-            return bool(self._client_for(provider).is_configured)
-        except Exception:
+            client = self._client_for(provider)
+        except ValueError:
             return False
+
+        # Prefer provider client flag if present
+        is_cfg = getattr(client, "is_configured", None)
+        if isinstance(is_cfg, bool):
+            return is_cfg
+
+        # Groq fallback: if client has no flag, use presence of the key
+        if provider == "groq":
+            return bool(self._groq_key)
+
+        # Default: assume available
+        return True
 
     # ----- Unified completion entry point -----
     def complete(
@@ -63,7 +113,8 @@ class LLMProvider:
         # --- Primary attempt ---
         primary = self._client_for(chosen_provider)
         try:
-            if not getattr(primary, "is_configured", False):
+            # If a provider is not configured, raise to trigger fallback
+            if not self.is_available(chosen_provider):
                 raise RuntimeError(f"{chosen_provider} not configured.")
             return primary.complete(
                 messages,
@@ -78,7 +129,7 @@ class LLMProvider:
 
             # --- Fallback to default (Qwen via OpenRouter) ---
             fallback = self._client_for(self._default.provider)
-            if not getattr(fallback, "is_configured", False):
+            if not self.is_available(self._default.provider):
                 # If fallback is also unavailable, re-raise original error
                 raise e
             return fallback.complete(
