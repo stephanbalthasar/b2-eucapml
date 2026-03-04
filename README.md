@@ -63,8 +63,11 @@ eucapml-mentor/
     │   └── filters.py           # Keyword & heuristic narrowing
     │
     ├── llm/
-    │   ├── client.py            # Model-agnostic LLM interface
-    │   └── groq.py              # Groq implementation
+    │   ├── __init__.py          
+    │   ├── groq.py            # Model-agnostic LLM interface
+    │   ├── openrouter.py            # Model-agnostic LLM interface
+    │   ├── llm_registry.py            # Model-agnostic LLM interface
+    │   └── llm_provider.py              # Groq implementation
     │
     ├── booklet/
     │   ├── parse.py             # Parse DOCX booklet into chunks
