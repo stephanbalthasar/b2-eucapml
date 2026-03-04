@@ -193,8 +193,8 @@ llm = GroqClient(api_key=llm_api_key)
 chat_engine = ChatEngine(
     llm=llm,
     booklet_index=INDEX,
-    booklet_retriever=chap_retriever,  # ChatEngine uses chapter-level grounding
-    web_retriever=None                 # add later if you want web RAG
+    booklet_retriever=para_retriever,  
+    web_retriever=None                 
 )
 feedback_engine = FeedbackEngine(llm=llm)
 
