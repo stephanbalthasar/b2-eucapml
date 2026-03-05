@@ -1,187 +1,155 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Build a compact JSON index from a DOCX booklet:
+Build an index (chapters + numbered paragraphs) from a DOCX.
 
-- Chapters: detected by Heading 1 (consecutively numbered)
-- Paragraphs: non-empty body paragraphs only (consecutively numbered)
-- No tables, no footnotes, no inlined numbering artifacts
-
-CLI:
-  python mentor/booklet/build_booklet_index.py \
-    --src private-src/assets/booklet.docx \
-    --out private-src/artifacts/booklet_index.json \
-    --verbose
+- Chapters: paragraphs styled Heading 1 / Überschrift 1 (robust detection with XML outline level fallback)
+- Paragraphs: those styled "Standard with para numbering" (plus common EN/DE variants)
+              or any paragraph that has list numbering (XML numPr) as a fallback
+- Outputs a JSON file with chapter and paragraph numbering:
+    * chapter_number: 1..N (in encounter order)
+    * global_para_number: consecutive across the whole booklet
+    * chapter_local_para_number: consecutive within each chapter
 """
-
-from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import json
+import os
 import sys
-from hashlib import blake2b
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
-from docx import Document
-from docx.text.paragraph import Paragraph
+from docx import Document  # pip install python-docx
 
 
-# ---------- utilities ----------
+HEADING1_STYLE_NAMES = {
+    "Heading 1",
+    "Überschrift 1",
+    "Überschrift1",
+}
 
-def _hash_id(text: str) -> str:
-    h = blake2b(digest_size=6)
-    h.update(text.strip().encode("utf-8"))
-    return "p_" + h.hexdigest()
+BODY_NUMBERED_STYLES = {
+    "Standard with para numbering",
+    "Standard mit Nummerierung",
+    "Normal mit Nummerierung",
+    "Normal with numbering",
+    "List Paragraph",  # Word built-in seen in some templates
+}
 
 
-def _clean_ws(s: str) -> str:
-    return " ".join((s or "").split()).strip()
-
-
-def _is_heading1(par: Paragraph) -> bool:
-    """
-    Detect Heading 1, including localized/custom base styles.
-    """
-    name = _clean_ws(getattr(par.style, "name", "")).lower()
-
-    # Common localized names for Heading 1
-    h1_names = {
-        "heading 1", "überschrift 1", "titre 1", "título 1",
-        "intestazione 1", "rubrica 1", "rubrique 1",
-        "naslov 1", "başlık 1", "заголовок 1", "標題 1", "見出し 1", "제목 1",
-    }
-    if name in h1_names:
-        return True
-
-    # Generic fallback: startswith token + " 1"
-    startswith_tokens = (
-        "heading", "überschrift", "titre", "título", "rubrica", "rubrique",
-        "intestazione", "naslov", "başlık", "заголовок", "標題", "見出し", "제목"
-    )
-    if any(name.startswith(tok + " ") and name.endswith("1") for tok in startswith_tokens):
-        return True
-
-    # Detect inheritance chain (best-effort)
+def _style_name(p) -> str:
     try:
-        base = par.style.base_style
-        while base is not None:
-            bname = _clean_ws(getattr(base, "name", "")).lower()
-            if bname in h1_names:
-                return True
-            if any(bname.startswith(tok + " ") and bname.endswith("1") for tok in startswith_tokens):
-                return True
-            base = base.base_style
+        if p.style and p.style.name:
+            return str(p.style.name)
     except Exception:
         pass
+    return ""
 
-    return False
 
-
-def _is_numbered_paragraph(par: Paragraph) -> bool:
+def _has_numbering(p) -> bool:
     """
-    Detect list numbering via Word numbering properties (numPr).
+    Fallback: treat any paragraph with w:numPr as numbered.
+    python-docx does not expose numbering at high level, so inspect the underlying XML.
     """
     try:
-        pPr = par._p.pPr  # access underlying oxml
+        pPr = p._p.pPr
         return (pPr is not None) and (pPr.numPr is not None)
     except Exception:
         return False
 
 
-# ---------- main builder ----------
+def _is_heading1(p) -> bool:
+    name = _style_name(p)
+    if name in HEADING1_STYLE_NAMES:
+        return True
+    # Tolerant match for templates with slightly different naming that end with " 1"
+    if name and ("Heading" in name or "Überschrift" in name) and name.rstrip().endswith("1"):
+        return True
+    # XML outline level (0 == Heading 1)
+    try:
+        pPr = p._p.pPr
+        if pPr is not None and pPr.outlineLvl is not None:
+            return pPr.outlineLvl.val == 0
+    except Exception:
+        pass
+    return False
 
-def build_index(docx_path: str, verbose: bool = False) -> Dict[str, Any]:
+
+def _is_numbered_body_para(p) -> bool:
+    name = _style_name(p)
+    if name in BODY_NUMBERED_STYLES:
+        return True
+    # Robust fallback: any list-numbered para in the DOCX
+    return _has_numbering(p)
+
+
+def build_index(docx_path: str) -> Dict[str, Any]:
+    if not os.path.exists(docx_path):
+        raise FileNotFoundError(f"Input DOCX not found: {docx_path}")
+
     doc = Document(docx_path)
 
     chapters: List[Dict[str, Any]] = []
-    paragraphs: List[Dict[str, Any]] = []
+    current = None
+    chapter_count = 0
+    global_para_no = 0
 
-    chapter_num: int = 0
-    chapter_title: Optional[str] = None
-    chapter_buf: List[str] = []
-    chapter_para_ids: List[str] = []
+    def ensure_current(default_title: str = ""):
+        nonlocal current, chapter_count
+        if current is None:
+            chapter_count += 1
+            current = {"chapter_number": chapter_count, "title": default_title, "paragraphs": []}
+            chapters.append(current)
 
-    para_counter = 0
-
-    def _flush_chapter():
-        nonlocal chapters, chapter_num, chapter_title, chapter_buf, chapter_para_ids
-        if chapter_title is not None:
-            chapters.append({
-                "chapter_num": chapter_num,
-                "title": chapter_title,
-                "text": "\n".join(chapter_buf).strip(),
-                "paragraph_ids": list(chapter_para_ids),
-            })
-
-    # Only body paragraphs; ignore tables/headers/footers
-    for par in doc.paragraphs:
-        text = _clean_ws(par.text)
-        style = _clean_ws(getattr(par.style, "name", ""))
-
-        # New chapter?
-        if _is_heading1(par):
-            _flush_chapter()
-            chapter_num += 1
-            chapter_title = text or f"Chapter {chapter_num}"
-            chapter_buf = []
-            chapter_para_ids = []
-            if verbose:
-                print(f"[H1] #{chapter_num}: {chapter_title}")
-            continue  # don't index heading lines as body paragraphs
-
-        # Skip empty lines
+    for p in doc.paragraphs:
+        text = (p.text or "").strip()
         if not text:
             continue
 
-        # Index non-empty body paragraphs
-        para_counter += 1
-        pid = _hash_id(f"{chapter_num}|{text}|{style}|p{para_counter}")
-        is_num = _is_numbered_paragraph(par)
+        if _is_heading1(p):
+            chapter_count += 1
+            current = {"chapter_number": chapter_count, "title": text, "paragraphs": []}
+            chapters.append(current)
+            continue
 
-        paragraphs.append({
-            "para_num": para_counter,
-            "id": pid,
-            "text": text,
-            "chapter_num": chapter_num or None,
-            "chapter_title": chapter_title if chapter_num else None,
-            "style": style,
-            "is_numbered": bool(is_num),
-        })
+        if _is_numbered_body_para(p):
+            ensure_current(default_title="")
+            global_para_no += 1
+            local_no = len(current["paragraphs"]) + 1
+            current["paragraphs"].append({
+                "global_para_number": global_para_no,
+                "chapter_local_para_number": local_no,
+                "text": text,
+            })
 
-        if chapter_num:
-            chapter_buf.append(text)
-            chapter_para_ids.append(pid)
+    payload = {
+        "generated_at": _dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "source": docx_path.replace("\\", "/"),
+        "stats": {
+            "chapters_detected": len(chapters),
+            "paragraphs_indexed": sum(len(ch["paragraphs"]) for ch in chapters),
+        },
+        "chapters": chapters,
+    }
+    return payload
 
-    _flush_chapter()
-    return {"paragraphs": paragraphs, "chapters": chapters}
 
+def main():
+    parser = argparse.ArgumentParser(description="Build JSON index from a DOCX booklet.")
+    parser.add_argument("--input", required=True, help="Path to assets/booklet.docx")
+    parser.add_argument("--output", required=True, help="Path to artifacts/booklet_index.json")
+    args = parser.parse_args()
 
-def main(argv: List[str]) -> int:
-    ap = argparse.ArgumentParser(description="Build booklet index (chapters + body paragraphs only)")
-    ap.add_argument("--src", required=True, help="Path to DOCX (e.g., private-src/assets/booklet.docx)")
-    ap.add_argument("--out", required=True, help="Path to output JSON (e.g., private-src/artifacts/booklet_index.json)")
-    ap.add_argument("--verbose", action="store_true", help="Verbose logging")
-    args = ap.parse_args(argv)
+    payload = build_index(args.input)
 
-    src = Path(args.src)
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out_dir = os.path.dirname(args.output)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
 
-    if not src.exists():
-        print(f"ERROR: source DOCX not found: {src}", file=sys.stderr)
-        return 2
+    with open(args.output, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
 
-    index = build_index(str(src), verbose=args.verbose)
-    ch = len(index.get("chapters", []))
-    ps = len(index.get("paragraphs", []))
-
-    print(f"Indexed {ch} chapters, {ps} paragraphs from {src}")
-
-    out.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Wrote {out}")
-    return 0
+    print(f"Wrote {args.output} with {payload['stats']['chapters_detected']} chapters / {payload['stats']['paragraphs_indexed']} paragraphs.")
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())
