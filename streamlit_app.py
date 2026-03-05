@@ -75,21 +75,20 @@ def render_conversation(
     if before_input:
         before_input()
 
-    # Clear button
-    col_a, col_b = st.columns([1, 4])
-    with col_a:
-        if st.button(clear_label, key=f"clear__{state_key}"):
-            # 1) wipe the thread
-            st.session_state[state_key] = []
-            # 2) immediately re-run so the UI shows a blank conversation + fresh input
-            st.rerun()
-
-    # Render transcript
+    # --- Transcript (messages) ---
     for msg in thread:
         with st.chat_message("user" if msg["role"] == "user" else "assistant"):
             st.markdown(msg["content"])
 
-    # Input. Give each conversation its own input key so parallel threads don't collide.
+    # --- Bottom-placed clear button (appears only when there is history) ---
+    if thread:
+        spacer, btn_col = st.columns([4, 1])
+        with btn_col:
+            if st.button(clear_label, key=f"clear_bottom__{state_key}"):
+                st.session_state[state_key] = []
+                st.rerun()
+
+    # --- Input (unique key per thread avoids collisions when used in several places) ---
     user_q = st.chat_input(placeholder, key=f"chat_input__{state_key}")
     if not user_q:
         return
@@ -110,8 +109,8 @@ def render_conversation(
     # Append assistant turn
     thread.append({"role": "assistant", "content": answer, "ts": time.time()})
 
-    # Re-run so Streamlit re-renders from the top and places a fresh st.chat_input
-    # *after* the full transcript. This ensures the input box remains at the bottom.
+    # Re-run so Streamlit re-renders the full transcript and places a fresh input box
+    # *after* the last answer (so the input is always at the bottom).
     st.rerun()
 
 # --- HERO (flat navy) ---
@@ -321,7 +320,13 @@ from mentor.engines.chat_engine import ChatEngine
 from mentor.engines.feedback_engine import FeedbackEngine
 from mentor.llm.groq import GroqClient
 
-st.set_page_config(page_title="EUCapML Mentor", page_icon="⚖️", layout="wide")
+st.set_page_config(
+    page_title="EUCapML Mentor",
+    page_icon="⚖️",
+    layout="wide",
+    initial_sidebar_state="collapsed"  # NEW: collapse sidebar by default
+)
+
 # Global width cap for a professional look (applies to all pages)
 st.markdown("""
 <style>
@@ -406,6 +411,14 @@ st.markdown("""
   }
 </style>
 <div class="appbar">European Capital Markets Law – Digital Mentor</div>
+""", unsafe_allow_html=True)
+
+# Keep the content higher up the page (authenticated screens)
+st.markdown("""
+<style>
+  /* Reduce default Streamlit top padding on the main container */
+  .block-container { padding-top: 0.5rem !important; }
+</style>
 """, unsafe_allow_html=True)
 
 # --- Build retrievers once ---
