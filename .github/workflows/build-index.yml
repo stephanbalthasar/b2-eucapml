@@ -2,29 +2,25 @@ name: Build booklet index (public → private artifacts)
 
 on:
   workflow_dispatch:
-  # Optional: run on a schedule as well
   schedule:
     - cron: '0 4 * * 1'  # Mondays 04:00 UTC
 
-# Least privilege by default; cross-repo push uses a PAT secret
 permissions:
   contents: read
 
 jobs:
   index-booklet:
-    runs-on: ubuntu-latest  # standard runner; free for public repos
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout this (public) repo
         uses: actions/checkout@v4
 
-      # Read the private Content repo to access booklet.docx
       - name: Checkout private repo (EUCapML-Mentor-Content)
         uses: actions/checkout@v4
         with:
           repository: stephanbalthasar/EUCapML-Mentor-Content
           ref: main
           path: private-src
-          # Fine-grained PAT secret with read+write on the private repo
           token: ${{ secrets.REPO_XPAT }}
 
       - name: Set up Python
@@ -37,28 +33,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install python-docx
 
+      # --- CHANGED: write output directly into the private repo checkout ---
       - name: Build JSON from DOCX
         run: |
           python mentor/booklet/build_booklet_index.py \
             --src "private-src/assets/booklet.docx" \
-            --out "artifacts/booklet_index.json" \
+            --out "private-src/artifacts/booklet_index.json" \
             --verbose
 
-      # Commit JSON to the private repo's artifacts/ directory
+      # --- CHANGED: no copy; commit the file that already sits in private-src/artifacts/ ---
       - name: Commit JSON into private repo (artifacts/)
         working-directory: private-src
         env:
           PAT: ${{ secrets.REPO_XPAT }}
         run: |
-          mkdir -p artifacts
-          cp -f "${GITHUB_WORKSPACE}/artifacts/booklet_index.json" artifacts/booklet_index.json
-
           # Remove checkout’s extra header before cross-repo push (important)
           git config --unset-all http.https://github.com/.extraheader || true
 
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git add artifacts/booklet_index.json
+
           if ! git diff --cached --quiet; then
             git commit -m "ci: update booklet_index.json"
             git push "https://x-access-token:${PAT}@github.com/stephanbalthasar/EUCapML-Mentor-Content.git" HEAD:main
