@@ -1,37 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Build a compact JSON index from a DOCX booklet with:
+Build a compact JSON index from a DOCX booklet:
 
 - Chapters: detected by Heading 1 (consecutively numbered)
 - Paragraphs: non-empty body paragraphs only (consecutively numbered)
+- No tables, no footnotes, no inlined numbering artifacts
 
-Footnotes and tables are intentionally ignored.
-
-Output schema:
-{
-  "paragraphs": [
-    {
-      "para_num": int,                # 1..N over body paragraphs (headings/empties skipped)
-      "id": "p_<hash8>",              # stable-ish id from content hash
-      "text": "Paragraph text",
-      "chapter_num": int | null,      # chapter this paragraph belongs to (if any)
-      "chapter_title": str | null,    # chapter title (if any)
-      "style": "Word style name",
-      "is_numbered": bool             # list-numbering flag from Word numPr
-    },
-    ...
-  ],
-  "chapters": [
-    {
-      "chapter_num": int,             # 1..M in document order
-      "title": "Heading text",
-      "text": "Concatenated chapter body text",
-      "paragraph_ids": ["p_<hash8>", ...]
-    },
-    ...
-  ]
-}
+CLI:
+  python mentor/booklet/build_booklet_index.py \
+    --src private-src/assets/booklet.docx \
+    --out private-src/artifacts/booklet_index.json \
+    --expect-chapters 7 --expect-paragraphs 190 --verbose
 """
 
 from __future__ import annotations
@@ -109,7 +89,7 @@ def _is_numbered_paragraph(par: Paragraph) -> bool:
         return False
 
 
-# ---------- main builder (paragraphs + chapters only) ----------
+# ---------- main builder ----------
 
 def build_index(docx_path: str, verbose: bool = False) -> Dict[str, Any]:
     doc = Document(docx_path)
@@ -134,7 +114,7 @@ def build_index(docx_path: str, verbose: bool = False) -> Dict[str, Any]:
                 "paragraph_ids": list(chapter_para_ids),
             })
 
-    # Only iterate over PARAGRAPHS; ignore tables and any other content types
+    # Only body paragraphs; ignore tables/headers/footers
     for par in doc.paragraphs:
         text = _clean_ws(par.text)
         style = _clean_ws(getattr(par.style, "name", ""))
@@ -142,24 +122,24 @@ def build_index(docx_path: str, verbose: bool = False) -> Dict[str, Any]:
         # New chapter?
         if _is_heading1(par):
             _flush_chapter()
-            chapter_num += 1  # consecutive numbering for chapters
+            chapter_num += 1
             chapter_title = text or f"Chapter {chapter_num}"
             chapter_buf = []
             chapter_para_ids = []
             if verbose:
                 print(f"[H1] #{chapter_num}: {chapter_title}")
-            continue  # heading itself is NOT indexed as a content paragraph
+            continue  # don't index heading lines as body paragraphs
 
         # Skip empty lines
         if not text:
             continue
 
-        # Only index non-empty body paragraphs
-        para_counter += 1  # consecutive numbering for body paragraphs
+        # Index non-empty body paragraphs
+        para_counter += 1
         pid = _hash_id(f"{chapter_num}|{text}|{style}|p{para_counter}")
         is_num = _is_numbered_paragraph(par)
 
-        record: Dict[str, Any] = {
+        paragraphs.append({
             "para_num": para_counter,
             "id": pid,
             "text": text,
@@ -167,19 +147,51 @@ def build_index(docx_path: str, verbose: bool = False) -> Dict[str, Any]:
             "chapter_title": chapter_title if chapter_num else None,
             "style": style,
             "is_numbered": bool(is_num),
-        }
-        paragraphs.append(record)
+        })
 
-        # Accumulate into current chapter
         if chapter_num:
             chapter_buf.append(text)
             chapter_para_ids.append(pid)
 
-    # Close the last chapter if any
     _flush_chapter()
-
     return {"paragraphs": paragraphs, "chapters": chapters}
 
 
 def main(argv: List[str]) -> int:
-    ap = argparse.ArgumentParser(description="Build booklet index with chapters and paragraphs only")
+    ap = argparse.ArgumentParser(description="Build booklet index (chapters + body paragraphs only)")
+    ap.add_argument("--src", required=True, help="Path to DOCX (e.g., private-src/assets/booklet.docx)")
+    ap.add_argument("--out", required=True, help="Path to output JSON (e.g., private-src/artifacts/booklet_index.json)")
+    ap.add_argument("--expect-chapters", type=int, default=None, help="Fail if chapter count differs")
+    ap.add_argument("--expect-paragraphs", type=int, default=None, help="Fail if paragraph count differs")
+    ap.add_argument("--verbose", action="store_true", help="Verbose logging")
+    args = ap.parse_args(argv)
+
+    src = Path(args.src)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    if not src.exists():
+        print(f"ERROR: source DOCX not found: {src}", file=sys.stderr)
+        return 2
+
+    index = build_index(str(src), verbose=args.verbose)
+    ch = len(index.get("chapters", []))
+    ps = len(index.get("paragraphs", []))
+
+    print(f"Indexed {ch} chapters, {ps} paragraphs from {src}")
+
+    # Expectations guardrail (optional; fail hard if mismatched)
+    if args.expect_chapters is not None and ch != args.expect_chapters:
+        print(f"ERROR: Expected {args.expect_chapters} chapters, got {ch}", file=sys.stderr)
+        return 3
+    if args.expect_paragraphs is not None and ps != args.expect_paragraphs:
+        print(f"ERROR: Expected {args.expect_paragraphs} paragraphs, got {ps}", file=sys.stderr)
+        return 4
+
+    out.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Wrote {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
