@@ -62,13 +62,13 @@ def render_conversation(
 ) -> None:
     """
     Generic chat renderer:
-      - Keeps a thread in st.session_state[state_key]
-      - Renders bubbles with st.chat_message + st.chat_input
-      - Calls on_ask(user_msg, history_without_current) -> assistant_reply
-      - Appends both turns back to the thread
+    - Keeps a thread in st.session_state[state_key]
+    - Renders bubbles with st.chat_message + st.chat_input
+    - Calls on_ask(user_msg, history_without_current) -> assistant_reply
+    - Appends both turns back to the thread
+    - Guarantees that the input box appears at the bottom after the latest answer
     """
     st.subheader(title)
-
     thread = _ensure_thread(state_key)
 
     # Optional top controls (e.g., info boxes)
@@ -79,17 +79,18 @@ def render_conversation(
     col_a, col_b = st.columns([1, 4])
     with col_a:
         if st.button(clear_label, key=f"clear__{state_key}"):
+            # 1) wipe the thread
             st.session_state[state_key] = []
-            st.success("Chat cleared.")
-            st.stop()
+            # 2) immediately re-run so the UI shows a blank conversation + fresh input
+            st.rerun()
 
     # Render transcript
     for msg in thread:
         with st.chat_message("user" if msg["role"] == "user" else "assistant"):
             st.markdown(msg["content"])
 
-    # Input
-    user_q = st.chat_input(placeholder)
+    # Input. Give each conversation its own input key so parallel threads don't collide.
+    user_q = st.chat_input(placeholder, key=f"chat_input__{state_key}")
     if not user_q:
         return
 
@@ -108,6 +109,11 @@ def render_conversation(
 
     # Append assistant turn
     thread.append({"role": "assistant", "content": answer, "ts": time.time()})
+
+    # Re-run so Streamlit re-renders from the top and places a fresh st.chat_input
+    # *after* the full transcript. This ensures the input box remains at the bottom.
+    st.rerun()
+
 # --- HERO (flat navy) ---
 def render_flat_navy_hero(
     title: str = "European Capital Markets Law - Digital Mentor",
