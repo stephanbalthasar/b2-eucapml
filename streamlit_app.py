@@ -667,7 +667,7 @@ with tab_feedback:
 # --- General Tutor Chat (conversation mode + booklet grounding) ---
 with tab_chat:
     def on_ask_tutor(user_q: str, history: List[Dict[str, Any]]) -> str:
-        # audit log for students (your existing behavior)
+        # audit log for students (existing behavior)
         if st.session_state.get("role") == "student":
             update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "CHAT", "student"])
 
@@ -682,18 +682,21 @@ with tab_chat:
             f"CURRENT question:\n{user_q}"
         ).strip()
 
-        # Ask the chat engine (same engine you already use)
-        return chat_engine.answer(
-            composed_q,
-            model=model,
-            temperature=temp,
-            max_tokens=800,
-        )
-
-    render_conversation(
-        state_key="tutor_chat",
-        title="Tutor chat (conversation mode)",
-        placeholder="Ask the tutor…",
-        on_ask=on_ask_tutor,
-        clear_label="🗑️ Clear chat",
-    )
+        try:
+            # Slightly lower max_tokens to ease rate pressure (optional)
+            return chat_engine.answer(
+                composed_q,
+                model=model,
+                temperature=temp,
+                max_tokens=700,  # was 800; small reduction
+            )
+        except Exception as e:
+            # Show a friendly, actionable message in the transcript
+            msg = str(e)
+            if "rate" in msg.lower() or "429" in msg:
+                return (
+                    "⏳ We’re hitting the provider’s rate limit right now. "
+                    "Please wait ~10–20 seconds and ask again."
+                )
+            # Fallback general message
+            return "Sorry—there was a temporary issue. Please try again in a few seconds."
