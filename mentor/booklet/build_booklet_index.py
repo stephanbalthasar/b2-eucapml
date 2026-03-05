@@ -34,6 +34,7 @@ Output schema:
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 import argparse
 import json
 import sys
@@ -157,34 +158,69 @@ def _is_numbered_paragraph(par: Paragraph) -> bool:
 
 
 # ---------- footnotes support ----------
-
 def _build_footnote_map(doc: Document) -> Dict[int, str]:
     """
     Build {footnote_id: "footnote text"} from the DOCX footnotes part.
     Skips separators/continuation footnotes. Returns {} if none present.
+    This version parses raw XML from the part's .blob to avoid relying on `.element`.
     """
+    # --- locate the footnotes part robustly ---
+    fn_part = None
     try:
+        # Preferred path if python-docx exposes the constant and specialized part
         fn_part = doc.part.part_related_by(RT.FOOTNOTES)
-    except KeyError:
+    except Exception:
+        # Fallback: scan relationships for .../footnotes
+        try:
+            for rel in doc.part.rels.values():
+                if str(rel.reltype).endswith("/footnotes"):
+                    fn_part = rel.target_part
+                    break
+        except Exception:
+            pass
+
+    if fn_part is None:
         return {}
 
-    ns = {"w": fn_part.element.nsmap.get("w", "http://schemas.openxmlformats.org/wordprocessingml/2006/main")}
+    # --- parse the XML from the part's blob ---
+    try:
+        root = ET.fromstring(fn_part.blob)
+    except Exception:
+        # If parsing fails, just return empty (no footnotes)
+        return {}
+
+    # Derive the WordprocessingML namespace from the root tag: {ns}footnotes
+    try:
+        w_ns = root.tag[root.tag.find("{") + 1 : root.tag.find("}")]
+    except Exception:
+        w_ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+    ns = {"w": w_ns}
     fn_map: Dict[int, str] = {}
 
-    # Only real footnotes: <w:footnote> without @w:type
-    for fn in fn_part.element.xpath("w:footnote[not(@w:type)]", namespaces=ns):
+    # Iterate real footnotes only: <w:footnote> elements without @w:type
+    for fn in root.findall("w:footnote", ns):
+        # Skip separator/continuation footnotes
+        if fn.get(f"{{{w_ns}}}type") is not None:
+            continue
+
+        fid_raw = fn.get(f"{{{w_ns}}}id")
         try:
-            fid = int(fn.get(qn("w:id")))
-        except (TypeError, ValueError):
+            fid = int(fid_raw) if fid_raw is not None else None
+        except ValueError:
+            fid = None
+        if fid is None:
             continue
 
         chunks: List[str] = []
-        for p in fn.xpath(".//w:p", namespaces=ns):
-            t = _clean_ws("".join(p.itertext()))
+        for p in fn.findall(".//w:p", ns):
+            # join all paragraph text
+            t = "".join(p.itertext())
+            t = " ".join(t.split()).strip()
             if t:
                 chunks.append(t)
 
-        txt = _clean_ws(" ".join(chunks))
+        txt = " ".join(chunks).strip()
         if txt:
             fn_map[fid] = txt
 
