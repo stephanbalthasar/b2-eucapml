@@ -1,4 +1,4 @@
-name: Build booklet index (public → private)
+name: Build booklet index (public → private artifacts)
 
 on:
   workflow_dispatch:
@@ -6,13 +6,13 @@ on:
   schedule:
     - cron: '0 4 * * 1'  # Mondays 04:00 UTC
 
-# Least privilege by default; we use a PAT for cross-repo push
+# Least privilege by default; cross-repo push uses a PAT secret
 permissions:
   contents: read
 
 jobs:
   index-booklet:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # standard runner; free for public repos
     steps:
       - name: Checkout this (public) repo
         uses: actions/checkout@v4
@@ -24,7 +24,8 @@ jobs:
           repository: stephanbalthasar/EUCapML-Mentor-Content
           ref: main
           path: private-src
-          token: ${{ secrets.REPO_XPAT }}  # fine-grained PAT
+          # Fine-grained PAT secret with read+write on the private repo
+          token: ${{ secrets.REPO_XPAT }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -43,21 +44,21 @@ jobs:
             --out "artifacts/booklet_index.json" \
             --verbose
 
-      # Commit JSON back to the private repo
-      - name: Commit JSON into private repo
+      # Commit JSON to the private repo's artifacts/ directory
+      - name: Commit JSON into private repo (artifacts/)
         working-directory: private-src
         env:
           PAT: ${{ secrets.REPO_XPAT }}
         run: |
-          mkdir -p data/index
-          cp -f "${GITHUB_WORKSPACE}/artifacts/booklet_index.json" data/index/booklet_index.json
+          mkdir -p artifacts
+          cp -f "${GITHUB_WORKSPACE}/artifacts/booklet_index.json" artifacts/booklet_index.json
 
           # Remove checkout’s extra header before cross-repo push (important)
           git config --unset-all http.https://github.com/.extraheader || true
 
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/index/booklet_index.json
+          git add artifacts/booklet_index.json
           if ! git diff --cached --quiet; then
             git commit -m "ci: update booklet_index.json"
             git push "https://x-access-token:${PAT}@github.com/stephanbalthasar/EUCapML-Mentor-Content.git" HEAD:main
