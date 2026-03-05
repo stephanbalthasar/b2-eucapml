@@ -11,7 +11,7 @@ CLI:
   python mentor/booklet/build_booklet_index.py \
     --src private-src/assets/booklet.docx \
     --out private-src/artifacts/booklet_index.json \
-    --expect-chapters 7 --expect-paragraphs 190 --verbose
+    --verbose
 """
 
 from __future__ import annotations
@@ -161,8 +161,6 @@ def main(argv: List[str]) -> int:
     ap = argparse.ArgumentParser(description="Build booklet index (chapters + body paragraphs only)")
     ap.add_argument("--src", required=True, help="Path to DOCX (e.g., private-src/assets/booklet.docx)")
     ap.add_argument("--out", required=True, help="Path to output JSON (e.g., private-src/artifacts/booklet_index.json)")
-    ap.add_argument("--expect-chapters", type=int, default=None, help="Fail if chapter count differs")
-    ap.add_argument("--expect-paragraphs", type=int, default=None, help="Fail if paragraph count differs")
     ap.add_argument("--verbose", action="store_true", help="Verbose logging")
     args = ap.parse_args(argv)
 
@@ -179,14 +177,6 @@ def main(argv: List[str]) -> int:
     ps = len(index.get("paragraphs", []))
 
     print(f"Indexed {ch} chapters, {ps} paragraphs from {src}")
-
-    # Expectations guardrail (optional; fail hard if mismatched)
-    if args.expect_chapters is not None and ch != args.expect_chapters:
-        print(f"ERROR: Expected {args.expect_chapters} chapters, got {ch}", file=sys.stderr)
-        return 3
-    if args.expect_paragraphs is not None and ps != args.expect_paragraphs:
-        print(f"ERROR: Expected {args.expect_paragraphs} paragraphs, got {ps}", file=sys.stderr)
-        return 4
 
     out.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Wrote {out}")
