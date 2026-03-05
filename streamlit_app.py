@@ -7,6 +7,112 @@ import requests
 import streamlit as st
 
 # === HELPERS ===
+# =============================
+# Conversation utilities (DRY)
+# =============================
+from typing import Callable, List, Dict, Any
+
+def _approx_tokens(s: str) -> int:
+    """Rough token estimate (~4 chars / token)."""
+    return max(1, len(s) // 4)
+
+def _build_history_preamble(history: List[Dict[str, str]], max_tokens: int = 6000) -> str:
+    """
+    Create a compact transcript (User/Assistant lines) from the most recent turns
+    within a token budget; keeps newest content.
+    """
+    if not history:
+        return ""
+    acc, used = [], 0
+    for turn in reversed(history):
+        line = f'{"User" if turn["role"]=="user" else "Assistant"}: {turn["content"]}'.strip()
+        t = _approx_tokens(line)
+        if used + t > max_tokens:
+            break
+        acc.append(line); used += t
+    acc.reverse()
+    return "\n".join(acc)
+
+def _ensure_thread(state_key: str) -> List[Dict[str, Any]]:
+    """
+    Ensure st.session_state[state_key] is a list[dict] with keys: role in {"user","assistant"}, content, ts.
+    Migrates old tuple-based history [('student'|'tutor', 'msg')] if present.
+    Returns the normalized list.
+    """
+    st.session_state.setdefault(state_key, [])
+    thread = st.session_state[state_key]
+    if thread and isinstance(thread[0], tuple):
+        # migrate tuples -> dicts; keep a best-effort role mapping
+        mapped: List[Dict[str, Any]] = []
+        for role, msg in thread:
+            r = "user" if role in ("user", "student") else "assistant"
+            mapped.append({"role": r, "content": msg, "ts": time.time()})
+        st.session_state[state_key] = mapped
+        thread = mapped
+    return thread
+
+def render_conversation(
+    *,
+    state_key: str,
+    title: str,
+    placeholder: str,
+    on_ask: Callable[[str, List[Dict[str, Any]]], str],
+    clear_label: str = "🗑️ Clear chat",
+    before_input: Callable[[], None] | None = None,
+) -> None:
+    """
+    Generic chat renderer:
+    - Keeps a thread in st.session_state[state_key]
+    - Renders bubbles with st.chat_message + st.chat_input
+    - Calls on_ask(user_msg, history_without_current) -> assistant_reply
+    - Appends both turns back to the thread
+    - Guarantees that the input box appears at the bottom after the latest answer
+    """
+    st.subheader(title)
+    thread = _ensure_thread(state_key)
+
+    # Optional top controls (e.g., info boxes)
+    if before_input:
+        before_input()
+
+    # --- Transcript (messages) ---
+    for msg in thread:
+        with st.chat_message("user" if msg["role"] == "user" else "assistant"):
+            st.markdown(msg["content"])
+
+    # --- Bottom-placed clear button (appears only when there is history) ---
+    if thread:
+        spacer, btn_col = st.columns([4, 1])
+        with btn_col:
+            if st.button(clear_label, key=f"clear_bottom__{state_key}"):
+                st.session_state[state_key] = []
+                st.rerun()
+
+    # --- Input (unique key per thread avoids collisions when used in several places) ---
+    user_q = st.chat_input(placeholder, key=f"chat_input__{state_key}")
+    if not user_q:
+        return
+
+    # Show user turn immediately
+    user_turn = {"role": "user", "content": user_q, "ts": time.time()}
+    thread.append(user_turn)
+    with st.chat_message("user"):
+        st.markdown(user_q)
+
+    # Call the app-provided handler with history (excluding the new turn)
+    prior = thread[:-1]
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking…"):
+            answer = on_ask(user_q, prior)
+            st.markdown(answer)
+
+    # Append assistant turn
+    thread.append({"role": "assistant", "content": answer, "ts": time.time()})
+
+    # Re-run so Streamlit re-renders the full transcript and places a fresh input box
+    # *after* the last answer (so the input is always at the bottom).
+    st.rerun()
+
 # --- HERO (flat navy) ---
 def render_flat_navy_hero(
     title: str = "European Capital Markets Law - Digital Mentor",
@@ -214,7 +320,13 @@ from mentor.engines.chat_engine import ChatEngine
 from mentor.engines.feedback_engine import FeedbackEngine
 from mentor.llm.groq import GroqClient
 
-st.set_page_config(page_title="EUCapML Mentor", page_icon="⚖️", layout="wide")
+st.set_page_config(
+    page_title="EUCapML Mentor",
+    page_icon="⚖️",
+    layout="wide",
+    initial_sidebar_state="collapsed"  # NEW: collapse sidebar by default
+)
+
 # Global width cap for a professional look (applies to all pages)
 st.markdown("""
 <style>
@@ -271,7 +383,7 @@ if not st.session_state.authenticated:
 
     if role_detected:
         agree = st.checkbox(
-            "I confirm I have read the AI & Privacy Notice (see the blue footer button)."
+            "I confirm I took note of the AI & Privacy Notice (see the blue button in the footer)."
         )
         st.caption("You must accept to continue.")
         if st.button("Continue", type="primary", disabled=not agree):
@@ -299,6 +411,14 @@ st.markdown("""
   }
 </style>
 <div class="appbar">European Capital Markets Law – Digital Mentor</div>
+""", unsafe_allow_html=True)
+
+# Keep the content higher up the page (authenticated screens)
+st.markdown("""
+<style>
+  /* Reduce default Streamlit top padding on the main container */
+  .block-container { padding-top: 0.5rem !important; }
+</style>
 """, unsafe_allow_html=True)
 
 # --- Build retrievers once ---
@@ -511,56 +631,82 @@ with tab_feedback:
             # -----------------------------
             # 6. FOLLOW-UP CHAT
             # -----------------------------
-            st.markdown("## Follow-up discussion")
-
-            st.session_state.setdefault("chat_history", [])
-
-            # show history
-            for role, msg in st.session_state["chat_history"]:
-                if role == "student":
-                    st.markdown(f"**You:** {msg}")
-                else:
-                    st.markdown(f"**Tutor:** {msg}")
-
-            follow_q = st.text_area("Your follow-up question", height=120)
-
-            if st.button("Send follow-up"):
-                if follow_q.strip():
-
-                    # add user's message
-                    st.session_state["chat_history"].append(("student", follow_q))
-
-                    # build conversation context
+            # --- Follow-up discussion (reuses the same conversation component) ---
+            with st.container():
+                def on_ask_followup(user_q: str, history: List[Dict[str, Any]]) -> str:
+                    # Build the history in the legacy tuple format that your feedback_engine expects
+                    tuple_hist = [
+                        ("student" if m["role"] == "user" else "tutor", m["content"])
+                        for m in history
+                    ]
                     context = {
-                        "student_answer": st.session_state["exam_answer"],
-                        "feedback": st.session_state["exam_feedback"],
-                        "history": st.session_state["chat_history"],
+                        "student_answer": st.session_state.get("exam_answer", ""),
+                        "feedback": st.session_state.get("exam_feedback", ""),
+                        "history": tuple_hist,
                     }
-
-                    # new engine call
-                    reply = feedback_engine.follow_up_with_history(
-                        question=follow_q,
+                    # Keep your audit behavior: log only for students
+                    if st.session_state.get("role") == "student":
+                        update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "FOLLOW_UP", "student"])
+            
+                    return feedback_engine.follow_up_with_history(
+                        question=user_q,
                         context=context,
                         model=model,
-                        temperature=temp
+                        temperature=temp,
                     )
-
-                    # store bot reply
-                    st.session_state["chat_history"].append(("tutor", reply))
-
-                    # force re-render
-                    st.rerun()
+            
+                # Use the same state key you already reset after evaluation to avoid surprises
+                render_conversation(
+                    state_key="chat_history",  # we keep the same key to preserve behavior / resets
+                    title="Follow-up discussion",
+                    placeholder="Add your follow-up question…",
+                    on_ask=on_ask_followup,
+                    clear_label="🗑️ Clear follow-up thread",
+                )
 
 # --- Tutor chat (separate, uncluttered) ---
+# --- General Tutor Chat (conversation mode + booklet grounding) ---
 with tab_chat:
-    st.subheader("Tutor chat (booklet‑grounded)")
-    q = st.text_area("Your question", height=140, placeholder="e.g., What is 'inside information' under MAR?")
-    if st.button("Ask", key="chat_btn"):
+    def on_ask_tutor(user_q: str, history: List[Dict[str, Any]]) -> str:
+        # audit log for students (existing behavior)
         if st.session_state.get("role") == "student":
             update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "CHAT", "student"])
-        if not q.strip():
-            st.warning("Please enter a question.")
-        else:
-            with st.spinner("Thinking..."):
-                reply = chat_engine.answer(q, model=model, temperature=temp, max_tokens=800)
-            st.markdown(reply)
+
+        # Build a compact preamble from prior turns; keep retrieval focused on CURRENT question
+        preamble = _build_history_preamble(history, max_tokens=6000)
+        composed_q = (
+            "You are in an ongoing conversation. Use the 'Conversation so far' only for context; "
+            "when searching the booklet, focus on the CURRENT question. "
+            "If you cite legal norms, prefer short forms (e.g., 'MAR Art. 17'). "
+            "Avoid fabricating case law.\n\n"
+            f"Conversation so far (most recent last):\n{preamble}\n\n"
+            f"CURRENT question:\n{user_q}"
+        ).strip()
+
+        try:
+            # Slightly lower max_tokens to ease rate pressure (optional)
+            return chat_engine.answer(
+                composed_q,
+                model=model,
+                temperature=temp,
+                max_tokens=700,  # was 800; small reduction to ease 429s
+            )
+        except Exception as e:
+            # Show a friendly, actionable message in the transcript
+            msg = str(e)
+            if "rate" in msg.lower() or "429" in msg:
+                return (
+                    "⏳ We’re hitting the provider’s rate limit right now. "
+                    "Please wait ~10–20 seconds and ask again."
+                )
+            # Fallback general message
+            return "Sorry—there was a temporary issue. Please try again in a few seconds."
+
+    # 👉 This call actually renders the chat UI inside the tab
+    render_conversation(
+        state_key="tutor_chat",
+        title="Tutor chat (conversation mode)",
+        placeholder="Ask the tutor…",
+        on_ask=on_ask_tutor,
+        clear_label="🗑️ Clear chat",
+    )
