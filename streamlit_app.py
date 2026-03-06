@@ -124,62 +124,51 @@ def render_flat_navy_hero(
     st.markdown(
         """
         <style>
-        /* Constrain page width for a premium feel */
-        .main > div { max-width: 1120px; margin: 0 auto; }
-    
-        /* Flat navy hero */
-        .sb-hero {
-          background: #0B1F3B; /* flat navy */
-          color: #ffffff;
-          border-radius: 14px;
-          padding: 14px 18px;              /* ↓ smaller vertical padding */
-          box-shadow: 0 8px 24px rgba(5,16,28,0.18);
-        }
-        .sb-hero-inner {
-          display: flex; align-items: center; gap: 16px;
-        }
-        .sb-hero h1 {
-          font-weight: 700; margin: 0 0 6px 0;
-          font-size: 1.9rem; line-height: 1.2;
-          letter-spacing: -0.2px;
-        }
-        .sb-hero p {
-          margin: 0; font-size: 1.05rem; line-height: 1.35; opacity: 0.92;
-        }
-    
-        /* Logo box kept small; the IMG itself is hard‑capped by max-height */
-        .sb-hero .sb-logo {
-          flex: 0 0 auto;
-          display: flex; align-items: center; justify-content: center;
-          width: 72px; height: 72px;      /* container target size */
-        }
-        .sb-hero .sb-logo img {
-          max-height: 64px;               /* HARD CAP: hero never grows too tall */
-          width: auto; height: auto;      /* preserve aspect ratio */
-          display: block;
-        }
-    
-        @media (max-width: 800px) {
-          .sb-hero-inner { flex-direction: row; align-items: center; gap: 12px; }
-          .sb-hero .sb-logo { width: 60px; height: 60px; }
-          .sb-hero .sb-logo img { max-height: 52px; }
-          .sb-hero h1 { font-size: 1.6rem; }
-        }
+            /* Constrain page width for a premium feel */
+            .main > div { max-width: 1120px; margin: 0 auto; }
+
+            /* Flat navy hero */
+            .sb-hero {
+                background: #0B1F3B;           /* flat navy */
+                color: #ffffff;
+                border-radius: 14px;
+                padding: 28px 24px;
+                box-shadow: 0 8px 24px rgba(5,16,28,0.18);
+            }
+            .sb-hero-inner {
+                display: flex; align-items: center; gap: 18px;
+            }
+            .sb-hero h1 {
+                font-weight: 700; margin: 0 0 8px 0;
+                font-size: 2.25rem; line-height: 1.2;
+                letter-spacing: -0.2px;
+            }
+            .sb-hero p {
+                margin: 0; font-size: 1.125rem;
+                line-height: 1.35; opacity: 0.92;
+            }
+            .sb-hero .sb-logo {
+                flex: 0 0 auto;
+                display: flex; align-items: center; justify-content: center;
+                width: 100px; height: 100px;
+            }
+            .sb-hero .sb-logo img { width: 100%; height: auto; }
+            @media (max-width: 800px) {
+                .sb-hero-inner { flex-direction: column; align-items: flex-start; }
+                .sb-hero .sb-logo { width: 84px; height: 84px; }
+            }
         </style>
         """,
         unsafe_allow_html=True
     )
-    
+
     # Render hero block
     st.markdown('<div class="sb-hero">', unsafe_allow_html=True)
     st.markdown('<div class="sb-hero-inner">', unsafe_allow_html=True)
     if logo_path:
         try:
             st.markdown('<div class="sb-logo">', unsafe_allow_html=True)
-            st.markdown(
-                f'<img src="{logo_path}" style="max-height: 90px; width: auto;" />',
-                unsafe_allow_html=True
-            )
+            st.image(logo_path, use_column_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
         except Exception:
             pass
@@ -370,13 +359,12 @@ if not st.session_state.authenticated:
     </style>
     """, unsafe_allow_html=True)
     # Flat navy hero (no CTAs here)
-    # Flat navy hero (no CTAs here)
     render_flat_navy_hero(
         title="European Capital Markets Law - Digital Mentor",
         subtitle="Master your Capital Markets Law Class with Confidence",
-        logo_path="assets/hero_logo.png"   # ← use the wide hero banner
+        logo_path="assets/logo.png"  # or None if you don’t want a logo
     )
-        
+    
     STUDENT_PIN = st.secrets.get("STUDENT_PIN")
     TUTOR_PIN   = st.secrets.get("TUTOR_PIN")
 
@@ -412,27 +400,17 @@ if not st.session_state.authenticated:
 # Compact app name bar (authenticated pages only)
 st.markdown("""
 <style>
-.appbar {
-  background: #F6F8FC;
-  color: #0B1F3B;
-  border: 1px solid #E7EAF0;
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-weight: 600;
-  margin: 6px 0 12px 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.appbar img { height: 28px; }            /* adjust to 24–36px if you like */
-@media (max-width: 640px){
-  .appbar img { height: 24px; }
-}
+  .appbar {
+    background: #F6F8FC;
+    color: #0B1F3B;
+    border: 1px solid #E7EAF0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-weight: 600;
+    margin: 6px 0 12px 0;
+  }
 </style>
-<div class="appbar">
-  <img src="assets/square_logo.png" alt="EUCapML logo" />
-  <span>European Capital Markets Law – Digital Mentor</span>
-</div>
+<div class="appbar">European Capital Markets Law – Digital Mentor</div>
 """, unsafe_allow_html=True)
 
 # Keep the content higher up the page (authenticated screens)
