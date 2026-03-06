@@ -150,7 +150,7 @@ def render_flat_navy_hero(
             .sb-hero .sb-logo {
                 flex: 0 0 auto;
                 display: flex; align-items: center; justify-content: center;
-                width: 100px; height: 100px;
+                width: 56px; height: 56px;
             }
             .sb-hero .sb-logo img { width: 100%; height: auto; }
             @media (max-width: 800px) {
