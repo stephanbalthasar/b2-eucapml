@@ -536,7 +536,7 @@ with st.sidebar:
         st.success("Re-loaded. Re-run the action to use the latest JSON.")
 
 # --- Tabs: Feedback + Tutor chat ---
-tab_feedback, tab_chat = st.tabs(["📝 Sample Exam Cases", "💬 General Tutor Chat"])
+tab_feedback, tab_chat = st.tabs(["📝 Sample Exam Cases", "💬 General Chat"])
 
 # Small helper: persist latest run per case+question
 def _key(case_id: str, q_label: str) -> str:
@@ -729,7 +729,7 @@ with tab_feedback:
                 )
 
 # --- Tutor chat (separate, uncluttered) ---
-# --- General Tutor Chat (conversation mode + booklet grounding) ---
+# --- General Chat (conversation mode + booklet grounding) ---
 with tab_chat:
     def on_ask_tutor(user_q: str, history: List[Dict[str, Any]]) -> str:
         # audit log for students (existing behavior)
@@ -769,7 +769,7 @@ with tab_chat:
     # 👉 This call actually renders the chat UI inside the tab
     render_conversation(
         state_key="tutor_chat",
-        title="Tutor chat (conversation mode)",
+        title="General chat (book-let grounded generic conversation)",
         placeholder="Ask the tutor…",
         on_ask=on_ask_tutor,
         clear_label="🗑️ Clear chat",
