@@ -8,23 +8,82 @@ import streamlit as st
 
 # === HELPERS ===
 # === BRAND HEADERS (simple & robust) ===
-def render_brand_hero(
-    icon_path: str = "assets/lamfalussy_L.svg",
+# === BRAND HEADER (precise alignment) ===
+def render_brand_hero_aligned(
+    icon_png: str = "assets/lamfalussy_L_256.png",   # use PNG here for reliable HTML <img> loading
     title: str = "Lamfalussy Code",
-    subhead: str = "Your European Capital Markets Law AI Mentor."
+    subhead: str = "Your European Capital Markets Law Mentor.",
+    icon_height_desktop: int = 96,   # px on desktop
+    icon_height_mobile: int = 72,    # px on small screens
+    nudge_px: int = 0                # fine-tune knob (0..3) if you want baseline-perfect bottom alignment
 ):
     """
-    Landing-page header: icon + big title + subhead (no HTML/CSS tricks).
+    Landing hero where the logo and the text block share the same height:
+    - Title is anchored to the TOP of the block.
+    - Subtitle is anchored to the BOTTOM of the block.
+    This guarantees: logo-top == title-top AND logo-bottom == subtitle-bottom.
     """
     import streamlit as st
-    col1, col2 = st.columns([1, 6])
-    with col1:
-        st.image(icon_path, width=88)
-    with col2:
-        st.markdown(f"# {title}")
-        # Use caption for a clean, smaller subhead that always renders
-        st.caption(subhead)
-    st.divider()
+
+    st.markdown(
+        f"""
+<style>
+  /* Container: logo + text */
+  .lc-hero {{
+    display: flex;
+    align-items: flex-start;        /* align tops of logo and text */
+    gap: 16px;
+    margin: 2px 0 10px 0;
+  }}
+  /* Fix the logo height; width auto */
+  .lc-logo {{
+    height: {icon_height_desktop}px;
+    width: auto;
+    display: block;
+  }}
+  /* The text column gets the SAME height as the logo */
+  .lc-text {{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* title top, subtitle bottom */
+    height: {icon_height_desktop}px;
+  }}
+  /* Title: bold, zero margins */
+  .lc-title {{
+    margin: 0;
+    font-weight: 700;
+    font-size: 2rem;
+    line-height: 1.12;              /* keep compact so top lines up crisply */
+    color: var(--text-color, #0B1F3B);
+  }}
+  /* Subtitle: zero margins; small transform lets you micro-adjust bottom baseline */
+  .lc-sub {{
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.12;
+    color: var(--text-color, #0B1F3B);
+    opacity: 0.92;
+    transform: translateY({nudge_px}px); /* tweak 0..3px if you want perfect baseline lock */
+  }}
+  /* Mobile: scale icon & height down, and the text tracks it automatically */
+  @media (max-width: 680px) {{
+    .lc-logo {{ height: {icon_height_mobile}px; }}
+    .lc-text {{ height: {icon_height_mobile}px; }}
+    .lc-title {{ font-size: 1.6rem; }}
+  }}
+</style>
+
+<div class="lc-hero">
+  <img class="lc-logo" src="{icon_png}" alt="Lamfalussy Code logo"/>
+  <div class="lc-text">
+    <h1 class="lc-title">{title}</h1>
+    <p class="lc-sub">{subhead}</p>
+  </div>
+</div>
+<hr style="border:none;border-top:1px solid #E7EAF0;margin:12px 0 8px 0;">
+""",
+        unsafe_allow_html=True
+    )
 
 
 def render_brand_bar(
@@ -445,10 +504,13 @@ if not st.session_state.authenticated:
         unsafe_allow_html=True,
     )
     
-    render_brand_hero(
-        icon_path="assets/lamfalussy_L.svg",
+    render_brand_hero_aligned(
+        icon_png="assets/lamfalussy_L_256.png",
         title="Lamfalussy Code",
-        subhead="Your European Capital Markets Law AI Mentor."
+        subhead="Your European Capital Markets Law Mentor.",  # as requested (no “AI” here)
+        icon_height_desktop=96,   # tweak to 100..112 if you want the header bigger
+        icon_height_mobile=72,    # tweak if needed
+        nudge_px=0                # try 1–2 if the subtitle baseline needs a hairline nudge down
     )
 
     STUDENT_PIN = st.secrets.get("STUDENT_PIN")
