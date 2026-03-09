@@ -15,8 +15,8 @@ from typing import Callable, List, Dict, Any
 # === HELPERS ===
 # === APP BAR ===
 def render_brand_bar_aligned(
-    icon_src: str = "assets/lamfalussy_L_128.png",
-    title: str = "Lamfalussy Code",
+    icon_src: str = "assets/logo_128.png",
+    title: str = "Balthasar's Code",
     subhead: str = "Your European Capital Markets Law AI Mentor.",
     bar_height_desktop: int = 44,
     bar_height_mobile: int = 38,
@@ -378,8 +378,8 @@ from mentor.engines.feedback_engine import FeedbackEngine
 from mentor.llm.groq import GroqClient
 
 st.set_page_config(
-    page_title="Lamfalussy Code",
-    page_icon="assets/lamfalussy_L_256.png",
+    page_title="Balthasar's Code",
+    page_icon="assets/logo_256.png",
     layout="wide",
     initial_sidebar_state="collapsed"  # NEW: collapse sidebar by default
 )
@@ -428,8 +428,8 @@ if not st.session_state.authenticated:
     
     # Landing
     render_brand_bar_aligned(
-        icon_src="assets/lamfalussy_L_128.png",
-        title="Lamfalussy Code",
+        icon_src="assets/logo_128.png",
+        title="Balthasar's Code",
         subhead="Your European Capital Markets Law AI Mentor.",
         bar_height_desktop=44, bar_height_mobile=38,
         logo_top_nudge_px=0, title_nudge_px=3, sub_nudge_px=-3
@@ -478,8 +478,8 @@ if not st.session_state.authenticated:
 
 # Compact brand bar (authenticated pages only)
 render_brand_bar_aligned(
-    icon_src="assets/lamfalussy_L_128.png",
-    title="Lamfalussy Code",
+    icon_src="assets/logo_128.png",
+    title="Balthasar's Code",
     subhead="Your European Capital Markets Law AI Mentor.",
     bar_height_desktop=44, bar_height_mobile=38,
     logo_top_nudge_px=0, title_nudge_px=3, sub_nudge_px=-3
