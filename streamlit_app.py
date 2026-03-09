@@ -514,7 +514,7 @@ if not st.session_state.authenticated:
         icon_height_mobile=72,
         nudge_px=0
     )
-    
+        
     STUDENT_PIN = st.secrets.get("STUDENT_PIN")
     TUTOR_PIN   = st.secrets.get("TUTOR_PIN")
 
