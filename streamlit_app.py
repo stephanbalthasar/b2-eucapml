@@ -431,7 +431,7 @@ if not st.session_state.authenticated:
         icon_src="assets/lamfalussy_L_128.png",
         title="Lamfalussy Code",
         subhead="Your European Capital Markets Law AI Mentor.",
-        bar_height_desktop=66, bar_height_mobile=38,
+        bar_height_desktop=44, bar_height_mobile=38,
         logo_top_nudge_px=0, title_nudge_px=3, sub_nudge_px=-3
     )
            
