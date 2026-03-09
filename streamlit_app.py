@@ -7,22 +7,26 @@ import requests
 import streamlit as st
 
 # === HELPERS ===
-# === BRAND HEADER (precise alignment) ===
-# === BRAND HEADER (precise alignment | fixed) ===
+# === BRAND HEADER (precise alignment | backwards-compatible & fixed) ===
 def render_brand_hero_aligned(
-    icon_src: str = "assets/lamfalussy_L_256.png",  # use PNG for reliable <img src="..."> loading
+    icon_src: str = "assets/lamfalussy_L_256.png",   # preferred arg name
     title: str = "Lamfalussy Code",
     subhead: str = "Your European Capital Markets Law Mentor.",
-    icon_height_desktop: int = 96,   # px on desktop
-    icon_height_mobile: int = 72,    # px on small screens
-    nudge_px: int = 0                # 0..2px micro-nudge if you want the subhead baseline a hair lower
+    icon_height_desktop: int = 96,                   # px on desktop
+    icon_height_mobile: int = 72,                    # px on small screens
+    nudge_px: int = 0,                               # 0..2 px micro-nudge for subtitle baseline
+    icon_png: str | None = None                      # legacy alias: will override icon_src if provided
 ):
     """
-    Landing hero where the logo and the text block share the same height:
-    - Title anchored to TOP, subtitle anchored to BOTTOM.
-    - Guarantees: logo-top == title-top, logo-bottom == subtitle-bottom.
+    Landing hero where logo and text share the same height:
+      • Title is anchored to TOP (logo top-aligned)
+      • Subtitle is anchored to BOTTOM (logo bottom-aligned)
+    NOTE: Supports both icon_src (preferred) and icon_png (legacy) to avoid crashes.
     """
     import streamlit as st
+
+    if icon_png:  # backwards-compat alias
+        icon_src = icon_png
 
     st.markdown(
         f"""
@@ -30,7 +34,7 @@ def render_brand_hero_aligned(
   /* Container: logo + text */
   .lc-hero {{
     display: flex;
-    align-items: flex-start;        /* align the tops of logo and text block */
+    align-items: flex-start;        /* align tops of logo and text block */
     gap: 16px;
     margin: 2px 0 10px 0;
   }}
@@ -62,7 +66,7 @@ def render_brand_hero_aligned(
     line-height: 1.12;
     color: #0B1F3B;
     opacity: 0.92;
-    transform: translateY({nudge_px}px); /* micro-adjust the bottom baseline if needed */
+    transform: translateY({nudge_px}px); /* micro-adjust if your font renderer is off by 1–2 px */
   }}
   /* Mobile tweaks */
   @media (max-width: 680px) {{
@@ -73,7 +77,7 @@ def render_brand_hero_aligned(
 </style>
 
 <div class="lc-hero">
-  <img class="lc-logo" src="{icon_src}" alt="Lamfalussy Code logo" />
+  <img class="lc-logo" src="{icon_src}" alt="Lamfalussy Code logo"/>
   <div class="lc-text">
     <h1 class="lc-title">{title}</h1>
     <p class="lc-sub">{subhead}</p>
@@ -503,14 +507,14 @@ if not st.session_state.authenticated:
     )
     
     render_brand_hero_aligned(
-        icon_png="assets/lamfalussy_L_256.png",
+        icon_src="assets/lamfalussy_L_256.png",
         title="Lamfalussy Code",
-        subhead="Your European Capital Markets Law Mentor.",  # as requested (no “AI” here)
-        icon_height_desktop=96,   # tweak to 100..112 if you want the header bigger
-        icon_height_mobile=72,    # tweak if needed
-        nudge_px=0                # try 1–2 if the subtitle baseline needs a hairline nudge down
+        subhead="Your European Capital Markets Law Mentor.",
+        icon_height_desktop=96,
+        icon_height_mobile=72,
+        nudge_px=0
     )
-
+    
     STUDENT_PIN = st.secrets.get("STUDENT_PIN")
     TUTOR_PIN   = st.secrets.get("TUTOR_PIN")
 
