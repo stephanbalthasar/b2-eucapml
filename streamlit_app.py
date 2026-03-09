@@ -15,8 +15,8 @@ def render_brand_hero_aligned(
     icon_height_desktop: int = 96,                   # px on desktop
     icon_height_mobile: int = 72,                    # px on small screens
     logo_top_nudge_px: int = 0,                      # +down / -up (logo fine‑tune)
-    title_nudge_px: int = 0,                         # +down / -up (title fine‑tune)
-    sub_nudge_px: int = 0                            # +down / -up (subtitle fine‑tune)
+    title_nudge_px: int = 20,                         # +down / -up (title fine‑tune)
+    sub_nudge_px: int = 20                            # +down / -up (subtitle fine‑tune)
 ):
     """
     Renders a landing hero where:
