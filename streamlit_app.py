@@ -92,7 +92,6 @@ def render_brand_hero_aligned(
 """,
         unsafe_allow_html=True,
     )
-
 # === APP BAR (authenticated) — mirrors landing layout, compact ===
 def render_brand_bar_aligned(
     icon_src: str = "assets/lamfalussy_L_128.png",
