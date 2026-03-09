@@ -1,0 +1,5 @@
+:root{ --brand-primary:#123B7A; --brand-primary-hover:#0F2D5A; --brand-focus:#1464A5; }
+/* Checkbox tick color */
+input[type="checkbox"]{ accent-color: var(--brand-primary); }
+/* Slightly thicker active tab underline; keeps primary color */
+[role="tablist"] [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-highlight"]{ height:2px; }
