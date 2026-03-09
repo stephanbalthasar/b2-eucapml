@@ -1,0 +1,49 @@
+[theme]
+base = "light"
+
+# Brand core (matches your sticky footer button)
+primaryColor = "#123B7A"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F8FC"
+textColor = "#0B1F3B"
+linkColor = "#123B7A"
+linkUnderline = true
+
+# Corners
+baseRadius = "medium"
+buttonRadius = "full"
+
+# Basic color palette (tamed for a premium look; keeps semantics)
+redColor = "#9E2A2A"
+redBackgroundColor = "#F8EDEE"
+redTextColor = "#6B1B1B"
+
+orangeColor = "#9C5A1A"
+orangeBackgroundColor = "#FBF2EA"
+orangeTextColor = "#5C3A12"
+
+yellowColor = "#8A6D1D"
+yellowBackgroundColor = "#FFF9E6"
+yellowTextColor = "#5E4A14"
+
+greenColor = "#2F6F46"
+greenBackgroundColor = "#EAF4EF"
+greenTextColor = "#1E4A31"
+
+blueColor = "#123B7A"
+blueBackgroundColor = "#E7EEF8"
+blueTextColor = "#0B1F3B"
+
+violetColor = "#5E4B8B"
+violetBackgroundColor = "#EFEAF7"
+violetTextColor = "#3E2F64"
+
+grayColor = "#6B7280"
+grayBackgroundColor = "#F3F4F6"
+grayTextColor = "#374151"
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F8FC"
+textColor = "#0B1F3B"
+primaryColor = "#123B7A"
