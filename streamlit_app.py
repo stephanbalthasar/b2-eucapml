@@ -443,7 +443,7 @@ if not st.session_state.authenticated:
     with st.form(key="login_form", clear_on_submit=False):
         pin = st.text_input("Enter password", type="password")
         agree = st.checkbox(
-            "I confirm I took note of the AI & Privacy Notice (see the blue button in the footer)."
+            "I confirm AI & Privacy Notice (see blue button in footer)."
         )
         submitted = st.form_submit_button("Continue", type="primary")
 
