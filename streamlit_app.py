@@ -7,48 +7,41 @@ import requests
 import streamlit as st
 
 # === HELPERS ===
+# === BRAND HEADERS (simple & robust) ===
 def render_brand_hero(
     icon_path: str = "assets/lamfalussy_L.svg",
     title: str = "Lamfalussy Code",
     subhead: str = "Your European Capital Markets Law AI Mentor."
 ):
+    """
+    Landing-page header: icon + big title + subhead (no HTML/CSS tricks).
+    """
     import streamlit as st
-    # minimal, responsive spacing
-    st.markdown(
-        """
-        <style>
-          .lc-hero{display:flex;align-items:center;gap:18px;background:#0B1F3B;
-                   color:#fff;border-radius:14px;padding:24px 20px;
-                   box-shadow:0 8px 24px rgba(5,16,28,0.18);}
-          .lc-hero h1{margin:0 0 4px 0;font-size:2rem;line-height:1.2;font-weight:700;}
-          .lc-hero p{margin:0;opacity:0.92;}
-          .lc-hero .lc-logo{flex:0 0 auto;width:88px;height:88px;display:flex;align-items:center;justify-content:center;}
-          @media (max-width: 680px){
-            .lc-hero{padding:18px 14px;border-radius:12px;}
-            .lc-hero h1{font-size:1.6rem;}
-            .lc-hero .lc-logo{width:72px;height:72px;}
-          }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    # Use columns so the <img> resolves reliably from local assets
-    col_logo, col_text = st.columns([1, 6], vertical_alignment="center")
-    with col_logo:
-        st.image(icon_path, use_container_width=True)
-    with col_text:
-        st.markdown(
-            f"""
-            <div class="lc-hero" style="background:transparent;padding:0;box-shadow:none;">
-              <div style="display:none;"></div>
-              <div>
-                <h1>{title}</h1>
-                <p>{subhead}</p>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        st.image(icon_path, width=88)
+    with col2:
+        st.markdown(f"# {title}")
+        # Use caption for a clean, smaller subhead that always renders
+        st.caption(subhead)
+    st.divider()
+
+
+def render_brand_bar(
+    icon_path: str = "assets/lamfalussy_L_64.png",
+    title: str = "Lamfalussy Code",
+    subhead: str = "Your European Capital Markets Law AI Mentor."
+):
+    """
+    Compact header for authenticated pages: small icon + bold title + caption.
+    """
+    import streamlit as st
+    col1, col2 = st.columns([1, 24])
+    with col1:
+        st.image(icon_path, width=28)
+    with col2:
+        st.markdown(f"**{title}**")
+        st.caption(subhead)
 
 # =============================
 # Conversation utilities (DRY)
@@ -500,39 +493,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # Compact brand bar (authenticated pages only)
-import streamlit as st
-
-st.markdown(
-    """
-    <style>
-      .lc-appbar {
-        background: #F6F8FC; color:#0B1F3B;
-        border:1px solid #E7EAF0; border-radius:10px;
-        padding:10px 12px; margin:6px 0 12px 0;
-      }
-      .lc-appbar .lc-row{ display:flex; align-items:center; gap:10px; }
-      .lc-appbar .lc-title{ font-weight:700; }
-      .lc-appbar .lc-sub{ font-size:0.95rem; opacity:0.85; margin-top:2px; }
-      @media (max-width:680px){
-        .lc-appbar .lc-sub{ display:none; } /* keep it tidy on phones */
-      }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-with st.container():
-    st.markdown('<div class="lc-appbar"><div class="lc-row">', unsafe_allow_html=True)
-    c1, c2 = st.columns([1, 16], vertical_alignment="center")
-    with c1:
-        st.image("assets/lamfalussy_L_64.png", width=32)  # white variant for dark bars if needed
-    with c2:
-        st.markdown(
-            '<div class="lc-title">Lamfalussy Code</div>'
-            '<div class="lc-sub">Your European Capital Markets Law AI Mentor.</div>',
-            unsafe_allow_html=True
-        )
-    st.markdown('</div></div>', unsafe_allow_html=True)
+render_brand_bar()
 
 # --- Build retrievers once ---
 para_retriever = ParagraphRetriever(INDEX["paragraphs"])
