@@ -91,7 +91,7 @@ def render_brand_bar_aligned(
 
 <div class="lc-appbar">
   <div class="lc-appbar-row">
-    <img class="lc-appbar-logo" src="{img_data_uri}" alt="Lamfalussy Code icon"/>
+    <img class="lc-appbar-logo" src="{img_data_uri}" alt="Balthasar's Code icon"/>
     <div class="lc-appbar-text">
       <div class="lc-appbar-title">{title}</div>
       <div class="lc-appbar-sub">{subhead}</div>
