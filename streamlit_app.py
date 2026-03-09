@@ -101,7 +101,7 @@ def render_brand_hero_aligned(
     )
 
 def render_brand_bar(
-    icon_path: str = "assets/lamfalussy_L_64.png",
+    icon_path: str = "assets/lamfalussy_L_128.png",
     title: str = "Lamfalussy Code",
     subhead: str = "Your European Capital Markets Law AI Mentor."
 ):
