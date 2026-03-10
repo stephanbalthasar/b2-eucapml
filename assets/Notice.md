@@ -1,7 +1,7 @@
-# Privacy & AI Transparency Notice — EUCapML Mentor
-Effective date: 2026-03-04
+# Privacy & AI Transparency Notice — B's Bot. Your AI Mentor for EU Capital Markets Law.
+Effective date: 2026-03-10
 
-This notice explains how the EUCapML Mentor ("App") functions, how it uses Artificial Intelligence ("AI") and Large Language Models ("LLMs"), and which external providers are involved ("Third Parties") that are outside the control of the App. 
+This notice explains how #B's Bot. Your AI Mentor for EU Capital Markets Law.# ("App") functions, how it uses Artificial Intelligence ("AI") and Large Language Models ("LLMs"), and which external providers are involved ("Third Parties") that are outside the control of the App. 
 
 1) Contact: The code for the App was created by Stephan Balthasar. The contact address for data / AI questions and exercising rights is: stephan.balthasar@uni-bayreuth.de.
 
