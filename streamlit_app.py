@@ -687,7 +687,7 @@ with tab_chat:
     # 👉 This call actually renders the chat UI inside the tab
     render_conversation(
         state_key="tutor_chat",
-        title="General chat (book-let grounded generic conversation)",
+        title="General chat (booklet grounded generic conversation)",
         placeholder="Ask the tutor…",
         on_ask=on_ask_tutor,
         clear_label="🗑️ Clear chat",
