@@ -205,100 +205,15 @@ def render_conversation(
     # *after* the last answer (so the input is always at the bottom).
     st.rerun()
 
-# --- HERO (flat navy) ---
-def render_sticky_footer():
-    st.markdown(
-        """
-        <style>
-        /* --- Sticky footer --- */
-        .sb-sticky-foot{
-          position: fixed; bottom: 0; left: 0; right: 0;
-          background: #ffffff;
-          border-top: 1px solid #E7EAF0;
-          box-shadow: 0 -2px 8px rgba(5,16,28,0.06);
-          z-index: 9999;
-          /* Respect iOS home indicator / safe area */
-          padding-bottom: env(safe-area-inset-bottom, 0px);
-        }
-
-        .sb-sticky-foot .sb-inner{
-          max-width: 1120px;
-          margin: 0 auto;
-          display: flex; align-items: center;
-          gap: 12px; padding: 8px 12px;
-          /* Allow wrapping on small screens */
-          white-space: normal;
-          flex-wrap: wrap;
-        }
-
-        .sb-foot-btn{
-          display: inline-block;
-          background: #123B7A; color: #fff !important;
-          border: 1px solid #123B7A;
-          padding: 6px 12px; border-radius: 999px;
-          text-decoration: none; font-weight: 600; font-size: 0.9rem;
-        }
-        .sb-foot-btn:hover{ background:#0F2D5A; border-color:#0F2D5A; }
-        .sb-foot-btn:focus-visible{ outline: 2px solid #1464A5; outline-offset: 2px; }
-
-        .sb-footnote{
-          color: #5B677A; font-size: 0.9rem;
-        }
-
-        /* --- Reserve space for the sticky footer, dynamically --- */
-        :root{
-          /* Updated by JS below */
-          --sb-foot-h: 72px;
-        }
-
-        /* Pad the main content so it never hides behind the footer.
-           Apply to both common Streamlit containers to be robust across versions. */
-        .block-container,
-        section.main > div {
-          padding-bottom: calc(var(--sb-foot-h, 72px) + env(safe-area-inset-bottom, 0px)) !important;
-        }
-
-        /* A little extra bottom air for very small viewports */
-        @media (max-width: 480px) {
-          .block-container,
-          section.main > div {
-            padding-bottom: calc(var(--sb-foot-h, 72px) + env(safe-area-inset-bottom, 0px) + 12px) !important;
-          }
-        }
-        </style>
-
-        <div class="sb-sticky-foot">
-          <div class="sb-inner">
-            <a class="sb-foot-btn" href="?show_privacy=1">AI & Privacy Notice</a>
-            <div class="sb-footnote">
-              © 2026 Stephan Balthasar · This app uses AI & LLMs; outputs may be inaccurate; no liability.
-              Feedback is not a grade predictor.
-            </div>
-          </div>
-        </div>
-
-        <script>
-          (function() {
-            function setFootHeight(){
-              try{
-                var f = document.querySelector('.sb-sticky-foot');
-                var h = f ? f.offsetHeight : 72;
-                document.documentElement.style.setProperty('--sb-foot-h', h + 'px');
-              } catch(e) {}
-            }
-            window.addEventListener('load', setFootHeight);
-            window.addEventListener('resize', setFootHeight);
-            window.addEventListener('orientationchange', setFootHeight);
-
-            // If Streamlit re-renders parts of the DOM, keep the measurement fresh
-            var obs = new MutationObserver(setFootHeight);
-            obs.observe(document.body, {childList: true, subtree: true});
-          })();
-        </script>
-        """,
-        unsafe_allow_html=True,
+def render_footer():
+    # Simple, non-sticky footer at the end of the page
+    st.divider()
+    st.caption(
+        "[AI & Privacy Notice](?show_privacy=1) · "
+        "© 2026 Stephan Balthasar · This app uses AI & LLMs; outputs may be inaccurate; no liability. "
+        "Feedback is not a grade predictor."
     )
-
+    
 # === PATCH 1: load the notice (Markdown file) ===
 def load_privacy_notice():
     file_path = os.path.join("assets", "Notice.md")
@@ -329,7 +244,7 @@ def render_privacy_overlay_if_requested():
     st.title("AI & Privacy Notice")
     st.markdown(notice_md)
     st.markdown("[← Back to the app](?)")
-    render_sticky_footer()
+    render_footer()
     st.stop()
 
 # --- minimalist logger: uses only LOG_GIST_TOKEN + GIST_ID ---
@@ -404,7 +319,6 @@ except Exception:
 
 # === PATCH 2: always-on footer and optional overlay ===
 render_privacy_overlay_if_requested()
-render_sticky_footer()
 
 # === PATCH 3: session flags ===
 if "authenticated" not in st.session_state:
@@ -443,7 +357,7 @@ if not st.session_state.authenticated:
     with st.form(key="login_form", clear_on_submit=False):
         pin = st.text_input("Enter password", type="password")
         agree = st.checkbox(
-            "Confirm AI & Privacy Notice (see blue button in footer)."
+            "Confirm AI & Privacy Notice (link in footer)."
         )
         submitted = st.form_submit_button("Continue", type="primary")
 
@@ -472,8 +386,7 @@ if not st.session_state.authenticated:
                 # log student login
                 update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "LOGIN", "student"])
             st.rerun()
-
-    # Stop rendering the rest of the app until authenticated
+    render_footer()
     st.stop()
 
 # Compact brand bar (authenticated pages only)
