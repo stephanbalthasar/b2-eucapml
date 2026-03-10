@@ -1,17 +1,109 @@
 # streamlit_app.py
 # Minimal UI to exercise both engines using the booklet index from the private repo.
 
-
-import json, time, os  # time is used by your existing call sites
-import requests  
+# ── imports (top of file) ──────────────────────────────────────────────────────
+import base64
+import json
+import mimetypes
+import os
+import requests
 import streamlit as st
+import time
+from typing import Callable, List, Dict, Any
+# ───────────────────────────────────────────────────────────────────────────────
 
 # === HELPERS ===
+# === APP BAR ===
+def render_brand_bar_aligned(
+    icon_src: str = "assets/b2_logo_1024.png",
+    title: str = "B's Bot",
+    subhead: str = "Your AI Mentor for European Capital Markets Law.",
+    bar_height_desktop: int = 44,
+    bar_height_mobile: int = 38,
+    logo_top_nudge_px: int = 0,
+    title_nudge_px: int = 0,
+    sub_nudge_px: int = 0
+) -> None:
+    # embed image as data-URI
+    try:
+        mime, _ = mimetypes.guess_type(icon_src)
+        if not mime:
+            mime = "image/png"
+        with open(icon_src, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        img_data_uri = f"data:{mime};base64,{b64}"
+    except Exception:
+        img_data_uri = icon_src
+
+    st.markdown(
+        f"""
+<style>
+  .lc-appbar {{
+    background: #F6F8FC;
+    border: 1px solid #E7EAF0;
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin: 6px 0 12px 0;
+  }}
+  .lc-appbar-row {{
+    display: flex;
+    align-items: flex-start;             /* lock logo top to text top */
+    gap: 10px;
+  }}
+  .lc-appbar-logo {{
+    height: {bar_height_desktop}px;
+    width: auto;
+    display: block;
+    position: relative;
+    top: {-logo_top_nudge_px}px;
+  }}
+  .lc-appbar-text {{
+    display: flex;
+    flex-direction: column;
+    height: {bar_height_desktop}px;      /* SAME height as logo */
+    min-height: {bar_height_desktop}px;
+  }}
+  .lc-appbar-title {{
+    margin: 0;
+    font-weight: 700;
+    font-size: 1.12rem;
+    line-height: 1.08;
+    position: relative;
+    top: {title_nudge_px}px;
+    color: #0B1F3B;
+  }}
+  .lc-appbar-sub {{
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.08;
+    margin-top: auto;                    /* pin subtitle to bottom edge */
+    position: relative;
+    top: {sub_nudge_px}px;
+    color: #0B1F3B; opacity: 0.90;
+  }}
+  @media (max-width: 680px) {{
+    .lc-appbar-logo {{ height: {bar_height_mobile}px; }}
+    .lc-appbar-text {{ height: {bar_height_mobile}px; min-height: {bar_height_mobile}px; }}
+    .lc-appbar-title {{ font-size: 1.02rem; }}
+    .lc-appbar-sub {{ font-size: 0.9rem; }}
+  }}
+</style>
+
+<div class="lc-appbar">
+  <div class="lc-appbar-row">
+    <img class="lc-appbar-logo" src="{img_data_uri}" alt="B's Bot icon"/>
+    <div class="lc-appbar-text">
+      <div class="lc-appbar-title">{title}</div>
+      <div class="lc-appbar-sub">{subhead}</div>
+    </div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
 # =============================
 # Conversation utilities (DRY)
 # =============================
-from typing import Callable, List, Dict, Any
-
 def _approx_tokens(s: str) -> int:
     """Rough token estimate (~4 chars / token)."""
     return max(1, len(s) // 4)
@@ -114,79 +206,7 @@ def render_conversation(
     st.rerun()
 
 # --- HERO (flat navy) ---
-def render_flat_navy_hero(
-    title: str = "European Capital Markets Law - AI Mentor",
-    subtitle: str = "Master your Capital Markets Law Class with Confidence",
-    logo_path: str | None = "assets/logo.png",  # set to None if you have no logo
-):
-    import streamlit as st
-
-    st.markdown(
-        """
-        <style>
-            /* Constrain page width for a premium feel */
-            .main > div { max-width: 1120px; margin: 0 auto; }
-
-            /* Flat navy hero */
-            .sb-hero {
-                background: #0B1F3B;           /* flat navy */
-                color: #ffffff;
-                border-radius: 14px;
-                padding: 28px 24px;
-                box-shadow: 0 8px 24px rgba(5,16,28,0.18);
-            }
-            .sb-hero-inner {
-                display: flex; align-items: center; gap: 18px;
-            }
-            .sb-hero h1 {
-                font-weight: 700; margin: 0 0 8px 0;
-                font-size: 2.25rem; line-height: 1.2;
-                letter-spacing: -0.2px;
-            }
-            .sb-hero p {
-                margin: 0; font-size: 1.125rem;
-                line-height: 1.35; opacity: 0.92;
-            }
-            .sb-hero .sb-logo {
-                flex: 0 0 auto;
-                display: flex; align-items: center; justify-content: center;
-                width: 100px; height: 100px;
-            }
-            .sb-hero .sb-logo img { width: 100%; height: auto; }
-            @media (max-width: 800px) {
-                .sb-hero-inner { flex-direction: column; align-items: flex-start; }
-                .sb-hero .sb-logo { width: 84px; height: 84px; }
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # Render hero block
-    st.markdown('<div class="sb-hero">', unsafe_allow_html=True)
-    st.markdown('<div class="sb-hero-inner">', unsafe_allow_html=True)
-    if logo_path:
-        try:
-            st.markdown('<div class="sb-logo">', unsafe_allow_html=True)
-            st.image(logo_path, use_column_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        except Exception:
-            pass
-    st.markdown(
-        f"""
-        <div class="sb-hero-text">
-            <h1>{title}</h1>
-            <p>{subtitle}</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    st.markdown('</div>', unsafe_allow_html=True)   # /sb-hero-inner
-    st.markdown('</div>', unsafe_allow_html=True)   # /sb-hero
-    st.markdown("")  # small spacing after hero
-
 def render_sticky_footer():
-    import streamlit as st
     st.markdown(
         """
         <style>
@@ -290,7 +310,6 @@ def load_privacy_notice():
 
 # === PATCH 1: privacy overlay (opens via ?show_privacy=1) ===
 def _get_query_params():
-    import streamlit as st
     try:
         return st.experimental_get_query_params()  # legacy API
     except Exception:
@@ -320,8 +339,6 @@ def update_gist(new_entry):
     Uses a dedicated token only: st.secrets['LOG_GIST_TOKEN'].
     If not configured, this function silently no-ops.
     """
-    import streamlit as st
-
     token = st.secrets.get("LOG_GIST_TOKEN")
     gist_id = st.secrets.get("GIST_ID")
     if not token or not gist_id:
@@ -361,8 +378,8 @@ from mentor.engines.feedback_engine import FeedbackEngine
 from mentor.llm.groq import GroqClient
 
 st.set_page_config(
-    page_title="EUCapML Mentor",
-    page_icon="⚖️",
+    page_title="B's Bot",
+    page_icon="assets/b2_logo_1024.png",
     layout="wide",
     initial_sidebar_state="collapsed"  # NEW: collapse sidebar by default
 )
@@ -408,14 +425,16 @@ if not st.session_state.authenticated:
         """,
         unsafe_allow_html=True,
     )
-
-    # Flat navy hero (no CTAs here)
-    render_flat_navy_hero(
-        title="European Capital Markets Law - AI Mentor",
-        subtitle="Master your Capital Markets Law Class with Confidence",
-        logo_path="assets/logo.png",  # or None if you don’t want a logo
+    
+    # Landing
+    render_brand_bar_aligned(
+        icon_src="assets/b2_logo_1024.png",
+        title="B's Bot",
+        subhead="Your AI Mentor for European Capital Markets Law.",
+        bar_height_desktop=44, bar_height_mobile=38,
+        logo_top_nudge_px=0, title_nudge_px=3, sub_nudge_px=-3
     )
-
+           
     STUDENT_PIN = st.secrets.get("STUDENT_PIN")
     TUTOR_PIN   = st.secrets.get("TUTOR_PIN")
 
@@ -424,7 +443,7 @@ if not st.session_state.authenticated:
     with st.form(key="login_form", clear_on_submit=False):
         pin = st.text_input("Enter password", type="password")
         agree = st.checkbox(
-            "I confirm I took note of the AI & Privacy Notice (see the blue button in the footer)."
+            "Confirm AI & Privacy Notice (see blue button in footer)."
         )
         submitted = st.form_submit_button("Continue", type="primary")
 
@@ -457,29 +476,14 @@ if not st.session_state.authenticated:
     # Stop rendering the rest of the app until authenticated
     st.stop()
 
-# Compact app name bar (authenticated pages only)
-st.markdown("""
-<style>
-  .appbar {
-    background: #F6F8FC;
-    color: #0B1F3B;
-    border: 1px solid #E7EAF0;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-weight: 600;
-    margin: 6px 0 12px 0;
-  }
-</style>
-<div class="appbar">European Capital Markets Law – AI Mentor</div>
-""", unsafe_allow_html=True)
-
-# Keep the content higher up the page (authenticated screens)
-st.markdown("""
-<style>
-  /* Reduce default Streamlit top padding on the main container */
-  .block-container { padding-top: 0.5rem !important; }
-</style>
-""", unsafe_allow_html=True)
+# Compact brand bar (authenticated pages only)
+render_brand_bar_aligned(
+    icon_src="assets/b2_logo_1024.png",
+    title="B's Bot",
+    subhead="Your AI Mentor for European Capital Markets Law.",
+    bar_height_desktop=44, bar_height_mobile=38,
+    logo_top_nudge_px=0, title_nudge_px=3, sub_nudge_px=-3
+)
 
 # --- Build retrievers once ---
 para_retriever = ParagraphRetriever(INDEX["paragraphs"])
@@ -532,7 +536,7 @@ with st.sidebar:
         st.success("Re-loaded. Re-run the action to use the latest JSON.")
 
 # --- Tabs: Feedback + Tutor chat ---
-tab_feedback, tab_chat = st.tabs(["📝 Sample Exam Cases", "💬 General Tutor Chat"])
+tab_feedback, tab_chat = st.tabs(["📝 Sample Exam Cases", "💬 General Chat"])
 
 # Small helper: persist latest run per case+question
 def _key(case_id: str, q_label: str) -> str:
@@ -725,7 +729,7 @@ with tab_feedback:
                 )
 
 # --- Tutor chat (separate, uncluttered) ---
-# --- General Tutor Chat (conversation mode + booklet grounding) ---
+# --- General Chat (conversation mode + booklet grounding) ---
 with tab_chat:
     def on_ask_tutor(user_q: str, history: List[Dict[str, Any]]) -> str:
         # audit log for students (existing behavior)
@@ -765,7 +769,7 @@ with tab_chat:
     # 👉 This call actually renders the chat UI inside the tab
     render_conversation(
         state_key="tutor_chat",
-        title="Tutor chat (conversation mode)",
+        title="General chat (book-let grounded generic conversation)",
         placeholder="Ask the tutor…",
         on_ask=on_ask_tutor,
         clear_label="🗑️ Clear chat",
