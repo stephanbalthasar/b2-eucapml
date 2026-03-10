@@ -386,8 +386,8 @@ if not st.session_state.authenticated:
                 # log student login
                 update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "LOGIN", "student"])
             st.rerun()
-    render_footer()
-    st.stop()
+render_footer()
+st.stop()
 
 # Compact brand bar (authenticated pages only)
 render_brand_bar_aligned(
