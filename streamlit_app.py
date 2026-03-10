@@ -15,9 +15,9 @@ from typing import Callable, List, Dict, Any
 # === HELPERS ===
 # === APP BAR ===
 def render_brand_bar_aligned(
-    icon_src: str = "assets/logo_128.png",
-    title: str = "Balthasar's Code",
-    subhead: str = "Your European Capital Markets Law AI Mentor.",
+    icon_src: str = "assets/B2_logo.png",
+    title: str = "B's Bot",
+    subhead: str = "Your AI Mentor for European Capital Markets Law.",
     bar_height_desktop: int = 44,
     bar_height_mobile: int = 38,
     logo_top_nudge_px: int = 0,
@@ -91,7 +91,7 @@ def render_brand_bar_aligned(
 
 <div class="lc-appbar">
   <div class="lc-appbar-row">
-    <img class="lc-appbar-logo" src="{img_data_uri}" alt="Balthasar's Code icon"/>
+    <img class="lc-appbar-logo" src="{img_data_uri}" alt="B's Bot icon"/>
     <div class="lc-appbar-text">
       <div class="lc-appbar-title">{title}</div>
       <div class="lc-appbar-sub">{subhead}</div>
@@ -378,8 +378,8 @@ from mentor.engines.feedback_engine import FeedbackEngine
 from mentor.llm.groq import GroqClient
 
 st.set_page_config(
-    page_title="Balthasar's Code",
-    page_icon="assets/logo_256.png",
+    page_title="B's Bot",
+    page_icon="assets/B2_logo.png",
     layout="wide",
     initial_sidebar_state="collapsed"  # NEW: collapse sidebar by default
 )
@@ -428,9 +428,9 @@ if not st.session_state.authenticated:
     
     # Landing
     render_brand_bar_aligned(
-        icon_src="assets/logo_128.png",
-        title="Balthasar's Code",
-        subhead="Your European Capital Markets Law AI Mentor.",
+        icon_src="assets/B2_logo.png",
+        title="B's Bot",
+        subhead="Your AI Mentor for European Capital Markets Law.",
         bar_height_desktop=44, bar_height_mobile=38,
         logo_top_nudge_px=0, title_nudge_px=3, sub_nudge_px=-3
     )
@@ -478,9 +478,9 @@ if not st.session_state.authenticated:
 
 # Compact brand bar (authenticated pages only)
 render_brand_bar_aligned(
-    icon_src="assets/logo_128.png",
-    title="Balthasar's Code",
-    subhead="Your European Capital Markets Law AI Mentor.",
+    icon_src="assets/B2_logo.png",
+    title="B's Bot",
+    subhead="Your AI Mentor for European Capital Markets Law.",
     bar_height_desktop=44, bar_height_mobile=38,
     logo_top_nudge_px=0, title_nudge_px=3, sub_nudge_px=-3
 )
