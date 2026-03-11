@@ -53,11 +53,8 @@ eucapml-mentor/
 └── assets/
     ├── Notice.md            # Privacy and AI Notice
 └── mentor/
-    ├── booklet/
-        ├── parse.py             # I wonder whether this is dead code
-        ├── index.py             # I wonder whether this is dead code
-        ├── retriever.py         # Query → relevant snippets  
-        └── build_booklet_index.py           # Builds index from booklet in private repo and stores json in private repo
+    ├── rag/
+        └── booklet_retriever.py         # Query → relevant snippets        
     ├── engines/
         ├── feedback_engine.py    Exam-style evaluator: plan/evaluate/explain
         └── chat_engine.py       # RAG-based tutor
@@ -65,9 +62,6 @@ eucapml-mentor/
         ├── __init__.py          
         ├── groq.py            
         └── client.py          # I wonder whether this is dead code           
-    ├── rag/
-        ├── __init__.py
-        └── retrieve.py          Is a placeholder
     ├── __init__.py              
     ├── core.py                  # Shared utilities
     └── prompts.py               # Prompt templates for both engines
@@ -128,7 +122,7 @@ Concrete implementation for Groq’s Llama models.
 ---
 
 ### **rag/**
-#### `index.py`
+#### `booklet_retriever.py`
 Builds and stores the semantic index of booklet chunks:
 
 chunking
@@ -136,53 +130,7 @@ embeddings
 metadata
 caching
 
-#### `filters.py`
-Pre‑retrieval keyword and heuristic filtering:
-
-case numbers
-paragraph numbers
-legal references (MAR, PR, §33 WpHG, etc.)
-
-#### `retrieve.py`
-Combines:
-
-semantic similarity
-filters
-ranking
-snippet grouping
-
 Used by both engines with different settings.
-
----
-
-### **booklet/**
-#### `parse.py`
-Reads the course booklet DOCX file and outputs:
-
-text chunks
-metadata
-case/paragraph anchors
-
-#### `anchors.py`
-Utility functions:
-
-detect “Case Study 30”
-detect “para. 115”
-handle citation strings
-
----
-
-#### `core.py`
-Shared utilities:
-
-keyword extraction
-safe text normalization
-cosine similarity wrappers
-citation number detection
-truncation helpers
-
-Simple, reusable functions with no Streamlit or LLM dependencies.
-
 ---
 
 #### `prompts.py`
