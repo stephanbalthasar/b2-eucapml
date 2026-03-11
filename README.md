@@ -53,8 +53,6 @@ eucapml-mentor/
 └── assets/
     ├── Notice.md            # Privacy and AI Notice
 └── mentor/
-    ├── rag/
-        └── booklet_retriever.py         # Query → relevant snippets        
     ├── engines/
         ├── feedback_engine.py    Exam-style evaluator: plan/evaluate/explain
         └── chat_engine.py       # RAG-based tutor
@@ -62,6 +60,8 @@ eucapml-mentor/
         ├── __init__.py          
         ├── groq.py            
         └── client.py          # I wonder whether this is dead code           
+    ├── rag/
+        └── booklet_retriever.py         # Query → relevant snippets        
     ├── __init__.py              
     ├── core.py                  # Shared utilities
     └── prompts.py               # Prompt templates for both engines
