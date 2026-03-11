@@ -1,6 +1,5 @@
 # mentor/engines/chat_engine.py
 from mentor.prompts import build_tutor_messages
-from mentor.rag.booklet_references_selector import rank_paragraphs_by_text, pick_para_nums
 
 class ChatEngine:
     """
@@ -231,12 +230,6 @@ class ChatEngine:
             reply_text += footer
     
         return reply_text
-                
-        ranked = rank_paragraphs_by_text(reply_text, hits, booklet_retriever=self.booklet_retriever)
-        selected_para_nums = pick_para_nums(ranked, max_n=5)
-        if selected_para_nums:
-            reply_text += "\n\n---\n" + "_Key paragraphs: " + ", ".join(selected_para_nums) + "._"
-
 
     # -------- helpers (kept) --------------------
     def _extract_keywords(self, text):
