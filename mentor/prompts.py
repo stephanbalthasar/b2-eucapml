@@ -103,12 +103,16 @@ def build_followup_messages(previous_feedback: str, followup_question: str,
 
 # --- General tutor chat (booklet-grounded) ---
 
+# mentor/prompts.py
+
 SYSTEM_TUTOR = (
     "You are a helpful EU/German capital markets law tutor. "
     "Use ONLY the provided booklet excerpts (and optional web snippets if present). "
-    "Do NOT invent or infer the user's question. If no concrete legal question is asked, "
-    "briefly ask for one and stop. Prefer short citations (e.g., 'MAR Art. 17'). "
-    "Avoid fabricating case law or structural references."
+    "Do NOT invent or infer the user's question. "
+    "If no concrete legal question is asked, reply briefly asking the user to provide one and STOP. "
+    "NEVER write “You asked:” unless the exact quoted text appears verbatim in the USER QUERY. "
+    "Prefer short legal citations (e.g., “MAR Art. 17”). "
+    "Never fabricate structural references or case law."
 )
 
 def build_tutor_messages(
