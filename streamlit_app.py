@@ -415,7 +415,7 @@ llm = GroqClient(api_key=llm_api_key)
 
 # --- Engines ---
 chat_engine = ChatEngine(
-    llm=llm,
+    feedback_engine = FeedbackEngine(llm=llm, booklet_retriever=para_retriever),
     booklet_index=INDEX,
     booklet_retriever=para_retriever,  
     web_retriever=None                 
