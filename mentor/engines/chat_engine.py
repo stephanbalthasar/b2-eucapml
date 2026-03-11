@@ -1,4 +1,5 @@
 # mentor/engines/chat_engine.py
+from mentor.prompts import build_tutor_messages
 
 class ChatEngine:
     """
@@ -15,7 +16,7 @@ class ChatEngine:
         self.booklet_retriever = booklet_retriever  # Prefer ParagraphRetriever
         self.web_retriever = web_retriever  # may be None for now
 
-    def answer(self, user_query, *, model, temperature, max_tokens=800):
+    def answer(self, user_query, *, model, temperature, max_tokens=800, conversation_preamble=None):
         """
         Generates an answer and then selects 0..5 booklet paragraphs that are
         meaningfully related to the *answer* (not the question).
@@ -198,13 +199,16 @@ class ChatEngine:
                 web_snippets = []
     
         # 4) Build messages for LLM
+        
         messages = self._build_prompt(
             user_query=user_query,
             booklet_chunks=booklet_chunks,
-            web_snippets=web_snippets
+            web_snippets=web_snippets,
+            conversation_preamble=conversation_preamble,
         )
     
         # 5) Ask LLM
+        
         result = self.llm.chat(
             messages=messages,
             model=model,
@@ -233,22 +237,11 @@ class ChatEngine:
         # For now: split by spaces and take simple tokens
         return [w.strip() for w in text.split() if len(w) > 3]
 
-    def _build_prompt(self, user_query, booklet_chunks, web_snippets):
-        system = (
-            "You are a helpful EU/German capital markets law tutor. "
-            "Use the provided booklet excerpts and optional web snippets. "
-            "If unsure, say what is known, and avoid fabricating structural references."
+    def _build_prompt(self, user_query, booklet_chunks, web_snippets, conversation_preamble=None):
+        # Single source of truth for tutor prompts
+        return build_tutor_messages(
+            user_query=user_query,
+            booklet_chunks=booklet_chunks,
+            web_snippets=web_snippets,
+            conversation_preamble=conversation_preamble,
         )
-        booklet_block = "\n\n".join(f"- {c}" for c in booklet_chunks[:15]) or "None"
-        web_block = "\n\n".join(f"- {s}" for s in web_snippets[:4]) or "None"
-
-        user_content = (
-            f"USER QUERY:\n{user_query}\n\n"
-            f"RELEVANT BOOKLET EXCERPTS:\n{booklet_block}\n\n"
-            f"RELEVANT WEB SNIPPETS:\n{web_block}\n\n"
-            "Please answer clearly and concisely."
-        )
-        return [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user_content}
-        ]
