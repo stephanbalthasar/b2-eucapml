@@ -28,7 +28,7 @@ class ChatEngine:
                 # Back-compat: ChapterRetriever branch
                 chapter = self.booklet_retriever.retrieve_best(user_query)
                 if chapter and isinstance(chapter, dict):
-                    from mentor.booklet.retriever import ParagraphRetriever
+                    from mentor.rag.booklet_retriever import ParagraphRetriever
                     chapter_num = chapter.get("chapter_num")
                     chapter_paras = [
                         p for p in (self.booklet_index.get("paragraphs") or [])
