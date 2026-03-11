@@ -100,3 +100,44 @@ def build_followup_messages(previous_feedback: str, followup_question: str,
     )
     return [{"role": "system", "content": system},
             {"role": "user",   "content": user}]
+
+# --- General tutor chat (booklet-grounded) ---
+
+SYSTEM_TUTOR = (
+    "You are a helpful EU/German capital markets law tutor. "
+    "Use ONLY the provided booklet excerpts (and optional web snippets if present). "
+    "Do NOT invent or infer the user's question. If no concrete legal question is asked, "
+    "briefly ask for one and stop. Prefer short citations (e.g., 'MAR Art. 17'). "
+    "Avoid fabricating case law or structural references."
+)
+
+def build_tutor_messages(
+    user_query: str,
+    booklet_chunks: list[str],
+    web_snippets: list[str],
+    conversation_preamble: str | None = None
+) -> list[dict]:
+    """
+    Centralized prompt for the general tutor chat.
+    - conversation_preamble: compact transcript (optional)
+    - booklet_chunks: up to 15 snippets (already trimmed by the engine)
+    - web_snippets: up to 4 snippets (not used in your app yet, but supported)
+    """
+    convo_block = (
+        f"Conversation so far (most recent last):\n{conversation_preamble}\n\n"
+        if conversation_preamble else ""
+    )
+    booklet_block = "\n\n".join(f"- {c}" for c in (booklet_chunks or [])[:15]) or "None"
+    web_block = "\n\n".join(f"- {s}" for s in (web_snippets or [])[:4]) or "None"
+
+    user_content = (
+        f"{convo_block}"
+        f"USER QUERY:\n{user_query}\n\n"
+        f"RELEVANT BOOKLET EXCERPTS:\n{booklet_block}\n\n"
+        f"RELEVANT WEB SNIPPETS:\n{web_block}\n\n"
+        "Please answer clearly and concisely."
+    )
+    return [
+        {"role": "system", "content": SYSTEM_TUTOR},
+        {"role": "user", "content": user_content},
+    ]
