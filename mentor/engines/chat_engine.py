@@ -1,4 +1,5 @@
 # mentor/engines/chat_engine.py
+import streamlit as st
 from mentor.prompts import build_tutor_messages, build_sources_gate_messages
 from mentor.rag.supporting_sources_selector import select_supporting_paragraphs
 
@@ -114,6 +115,14 @@ class ChatEngine:
                 ) or []
             except Exception:
                 web_snippets = []
+            # after web retrieval succeeds or errors are handled
+        if isinstance(web_snippets, list):
+            # quick debug so you can see what came back in Streamlit
+            st.session_state["__web_snippets_debug__"] = {
+                "query": user_query,
+                "snippets": web_snippets[:4],
+                "count": len(web_snippets),
+            }
     
         # 4) Build messages for LLM
         
