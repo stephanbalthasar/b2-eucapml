@@ -58,15 +58,7 @@ class ChatEngine:
             )
             hits = sum(k in t for k in meta_kw)
             return short and hits >= 2
-    
-        def _score_hits_against_answer(answer_text: str, hits: list[dict]) -> list[tuple[float, dict]]:
-            """
-            Returns list of (score, hit_dict), sorted desc.
-            Prefers embeddings; otherwise acronym-aware lexical cosine.
-            """
-            if not answer_text or not hits:
-                return []
-    
+        
             # 1) Embeddings
             embedder = getattr(self.booklet_retriever, "embedder", None)
             if embedder is not None:
@@ -95,59 +87,7 @@ class ChatEngine:
                 scored.append((score, {**h, "_sim_mode": "lex"}))
             scored.sort(key=lambda x: x[0], reverse=True)
             return scored
-    
-        def _select_supporting_paras(answer_text: str, hits: list[dict], max_n: int = 5) -> list[str]:
-            """
-            Select 0..5 paragraphs only if there is meaningful similarity to the *answer*.
-            - Embedding mode gates: top >= 0.28 AND (top - median) >= 0.08
-            - Lexical mode gates:   top >= 0.14 AND (top - median) >= 0.05
-            - Also require a minimal 'legal signal' in the answer (MAR/WpHG/etc.).
-            """
-            ranked = _score_hits_against_answer(answer_text, hits)
-            if not ranked:
-                return []
-    
-            # --- gate 1: legal signal in the answer (skip meta/very generic) ---
-            LEGAL_TERMS = {
-                "mar", "mifid", "mica", "esma", "bafin", "wphg",
-                "prospekt", "ad-hoc", "adhoc", "insider", "marktmanipulation",
-                "stimmrechte", "major", "holdings", "emittent", "ad-hoc-pflicht",
-                "art", "§"  # allow citations like "Art. 17", "§ 33"
-            }
-            answer_tokens = {w.lower() for w in _tok_keep_acronyms(answer_text)}
-            if not (answer_tokens & LEGAL_TERMS):
-                return []  # no legal substance -> no footer
-    
-            # --- gate 2: absolute + relative similarity thresholds ---
-            scores = [s for s, _ in ranked]
-            if not scores:
-                return []
-            import numpy as _np
-            top, med = scores[0], float(_np.median(scores))
-            mode = ranked[0][1].get("_sim_mode", "lex")
-            min_abs = 0.28 if mode == "embed" else 0.14
-            min_gap = 0.08 if mode == "embed" else 0.05
-            if top < min_abs or (top - med) < min_gap:
-                return []  # weak/flat distribution -> no footer
-    
-            # --- take up to 5 distinct para_num entries ---
-            selected, seen = [], set()
-            for score, h in ranked:
-                # apply per-item absolute floor as well
-                threshold = 0.20 if mode == "embed" else 0.10
-                if score < threshold:
-                    continue
-                pnum = h.get("para_num")
-                if pnum is None or pnum in seen:
-                    continue
-                seen.add(pnum)
-                selected.append(str(pnum))
-                if len(selected) == max_n:
-                    break
-            return selected
-        # ------------------------------------------------------------------------
-        
-      
+          
         # 1) Simple keyword extraction (existing logic)
         keywords = self._extract_keywords(user_query)
     
@@ -224,7 +164,12 @@ class ChatEngine:
             return reply_text  # early exit: greetings/housekeeping -> no footer
     
         # 6) NEW: pick 0..5 supporting paragraph numbers based on the *answer*
-        selected_para_nums = _select_supporting_paras(reply_text, hits, max_n=5)
+        selected_para_nums = select_supporting_paragraphs(
+            reply_text,
+            hits,
+            booklet_retriever=self.booklet_retriever,
+            max_n=5
+        )
     
         # Append footer only if we actually have meaningful support
         if selected_para_nums:
