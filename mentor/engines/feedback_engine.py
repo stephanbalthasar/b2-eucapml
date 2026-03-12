@@ -23,6 +23,7 @@ class FeedbackEngine:
                     "[FE] No booklet retriever attached – prompt grounding and source selection are disabled."
                 )
             except Exception:
+                pass
 
     # -------------------------------------------------------
     # (i) PLAN  ---- CHANGED SIGNATURE ----
