@@ -7,7 +7,6 @@ from __future__ import annotations
 import numpy as np
 import string
 
-
 # --- tiny helper to keep acronyms like MAR, WpHG, ESMA, MiCA ---
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
 
@@ -101,3 +100,49 @@ class ChapterRetriever:
         sims = np.dot(self._emb, qv)
         best_idx = int(np.argmax(sims))
         return self.chapters[best_idx]
+
+
+
+# mentor/rag/supporting_sources_selector.py
+
+from __future__ import annotations
+from typing import List, Dict, Tuple
+
+def fetch_booklet_chunks_for_prompt(
+    retriever,
+    query: str,
+    *,
+    top_k: int = 15,
+    truncate_chars: int | None = None,
+) -> Tuple[List[Dict], List[str]]:
+    """
+    Reuse the ChatEngine pattern:
+      - call retriever.retrieve(query, top_k=15)
+      - normalize to a list[str] for the prompt
+      - optionally truncate long paragraphs (kept off by default)
+
+    Returns:
+      (hits, booklet_chunks)
+        hits: original list[dict] items from the retriever
+        booklet_chunks: list[str] derived from 'text' fields (optionally truncated)
+    """
+    hits: List[Dict] = []
+    try:
+        if hasattr(retriever, "retrieve"):
+            try:
+                hits = retriever.retrieve(query, top_k=top_k) or []
+            except TypeError:
+                # supports retrievers that use named arguments
+                hits = retriever.retrieve(query=query, top_k=top_k) or []
+    except Exception:
+        hits = []
+
+    chunks: List[str] = []
+    for h in hits:
+        t = h.get("text") if isinstance(h, dict) else str(h)
+        if not t:
+            continue
+        if truncate_chars and len(t) > truncate_chars:
+            t = t[:truncate_chars] + "…"
+        chunks.append(t)
+    return hits, chunks
