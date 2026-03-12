@@ -89,6 +89,11 @@ class FeedbackEngine:
                 # optional: enable truncation if your paragraphs are very long
                 # truncate_chars=700,
             )
+            # mentor/engines/feedback_engine.py (inside follow_up_with_history, after fetch_booklet_chunks_for_prompt)
+            print(f"[FE] booklet_chunks: {len(booklet_chunks)}")
+            if booklet_chunks:
+                print("[FE] first chunk:", booklet_chunks[0][:120].replace("\n", " "))
+
 
     
         # LLM call
