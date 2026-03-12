@@ -69,38 +69,26 @@ class FeedbackEngine:
         booklet_chunks: list[str] = []
         if getattr(self, "booklet_retriever", None) is not None:
             try:
-                # A) query by the current follow-up question (user intent right now)
+                # A) from follow-up question
                 _hits_q, chunks_q = fetch_booklet_chunks_for_prompt(
-                    self.booklet_retriever,
-                    question or "",
-                    top_k=15,
-                    # optional: uncomment if you want shorter chunks in the prompt
-                    # truncate_chars=700,
+                    self.booklet_retriever, question or "", top_k=15,
+                    # truncate_chars=700,  # optional
                 )
-    
-                # B) query by the prior feedback text (captures phrasing/terms the LLM answered with)
+                # B) from prior feedback text
                 _hits_fb, chunks_fb = fetch_booklet_chunks_for_prompt(
-                    self.booklet_retriever,
-                    (context.get("feedback") or ""),
-                    top_k=15,
+                    self.booklet_retriever, (context.get("feedback") or ""), top_k=15,
                     # truncate_chars=700,
                 )
-    
-                # C) merge + deduplicate while preserving order; cap to ~12 for prompt brevity
-                merged = []
-                seen = set()
+                # C) merge + dedupe; cap to 12 for prompt brevity
+                merged, seen = [], set()
                 for t in (chunks_q + chunks_fb):
-                    if not t: 
-                        continue
-                    if t in seen:
+                    if not t or t in seen:
                         continue
                     seen.add(t)
                     merged.append(t)
                     if len(merged) == 12:
                         break
-    
                 booklet_chunks = merged
-    
             except Exception:
                 booklet_chunks = []
     
@@ -124,29 +112,30 @@ class FeedbackEngine:
         # 4) Current question (kept)
         messages.append({"role": "user", "content": question})
     
-        # 5) LLM call (kept)
-        return self.llm.chat(
+        # 5) Call LLM and coerce to plain string (no early return)
+        raw = self.llm.chat(
             messages=messages,
             model=model,
             temperature=temperature,
             max_tokens=800,
         )
-
-        # 6) Add sources
+        reply_text = raw if isinstance(raw, str) else str(raw)
+    
+        # 6) Gate: should we attach sources for THIS answer? (deterministic, temp=0)
         try:
             gate_msgs = build_sources_gate_messages(user_query=question, answer_text=reply_text)
             gate_raw = self.llm.chat(gate_msgs, model=model, temperature=0.0, max_tokens=4)
             gate_txt = gate_raw if isinstance(gate_raw, str) else str(gate_raw)
             show_sources = gate_txt.strip().upper().startswith("YES")
         except Exception:
-            show_sources = False  # conservative: don't show if the gate fails
-        
+            show_sources = False  # conservative
+    
+        # 7) If YES, run the answer-driven selector (no hits passed => retrieve by answer_text)
         if show_sources and getattr(self, "booklet_retriever", None) is not None:
             try:
-                # Answer‑driven selection: the selector retrieves top_k for the *answer_text*
                 picked = select_supporting_paragraphs(
                     answer_text=reply_text,
-                    hits=None,  # None => selector retrieves with answer_text as query
+                    hits=None,  # selector retrieves with answer_text as query
                     booklet_retriever=self.booklet_retriever,
                     top_k=15,
                     max_n=5,
@@ -155,5 +144,6 @@ class FeedbackEngine:
                     reply_text += "\n\n---\n" + "_Key paragraphs: " + ", ".join(picked) + "._"
             except Exception:
                 pass
-        
+    
+        # 8) Return a plain string (no trailing comma)
         return reply_text
