@@ -1,7 +1,6 @@
 # mentor/engines/chat_engine.py
-from mentor.prompts import build_tutor_messages
+from mentor.prompts import build_tutor_messages, build_sources_gate_messages
 from mentor.rag.supporting_sources_selector import select_supporting_paragraphs
-
 
 class ChatEngine:
     """
@@ -17,6 +16,26 @@ class ChatEngine:
         self.booklet_index = booklet_index
         self.booklet_retriever = booklet_retriever  # Prefer ParagraphRetriever
         self.web_retriever = web_retriever  # may be None for now
+
+    def _should_show_sources(self, user_query: str, reply_text: str, *, model: str) -> bool:
+    """
+    Asks the LLM (temperature=0) whether the answer merits booklet references.
+    Returns True only on a clean 'YES'. Any other output falls back to heuristic False.
+    """
+    messages = build_sources_gate_messages(user_query=user_query, answer_text=reply_text)
+    try:
+        res = self.llm.chat(messages=messages, model=model, temperature=0.0, max_tokens=4)
+        text = res if isinstance(res, str) else str(res)
+        out = text.strip().upper()
+        # accept minimal variants; keep this small to stay deterministic
+        if out.startswith("YES"):
+            return True
+        if out.startswith("NO"):
+            return False
+    except Exception:
+        pass
+    # Fallback: conservative (no sources) if the gate fails
+    return False
 
     def answer(self, user_query, *, model, temperature, max_tokens=800, conversation_preamble=None):
         """
@@ -43,25 +62,7 @@ class ChatEngine:
                 if len(tl) > 3:
                     out.add(tl)
             return out
-    
-        def _is_meta_answer(text: str) -> bool:
-            """Detect greetings/housekeeping answers where we should show no footer."""
-            t = (text or "").lower()
-            # short & meta-ish phrasing is enough to skip
-            short = len(t) < 280
-            meta_kw = (
-                "hi", "hello", "hallo", "hey",
-                "chat", "reden", "sprechen", "talk", "discuss",
-                "fragen", "question", "questions",
-                "booklet", "broschüre", "heft",
-                "let's", "können wir", "kann ich", "kannst du", "gerne", "klar", "sure"
-            )
-            hits = sum(k in t for k in meta_kw)
-            return short and hits >= 2
-        
-            # 1) Embeddings (moved to sources selector)
-            # 2) Lexical fallback (binary-cosine) (moved to sources selector)
-                      
+                          
         # 1) Simple keyword extraction (existing logic)
         keywords = self._extract_keywords(user_query)
     
@@ -134,8 +135,9 @@ class ChatEngine:
     
         # Coerce to plain string for display
         reply_text = result if isinstance(result, str) else str(result)
-        if _is_meta_answer(reply_text):
-            return reply_text  # early exit: greetings/housekeeping -> no footer
+        # Ask the LLM if sources are appropriate for THIS answer (deterministic gate)
+        if not self._should_show_sources(user_query=user_query, reply_text=reply_text, model=model):
+            return reply_text
     
         # 6) NEW: pick 0..5 supporting paragraph numbers based on the *answer*
         selected_para_nums = select_supporting_paragraphs(
