@@ -2,10 +2,10 @@
 # Lightweight retrievers for paragraphs and chapters.
 # Uses keyword overlap by default; can switch to embeddings if you pass an encoder with .encode()
 
-from __future__ import annotations
-
 import numpy as np
 import string
+from __future__ import annotations
+from typing import List, Dict, Tuple
 
 # --- tiny helper to keep acronyms like MAR, WpHG, ESMA, MiCA ---
 _PUNCT_TABLE = str.maketrans("", "", string.punctuation)
@@ -104,10 +104,6 @@ class ChapterRetriever:
 
 
 # mentor/rag/supporting_sources_selector.py
-
-from __future__ import annotations
-from typing import List, Dict, Tuple
-
 def fetch_booklet_chunks_for_prompt(
     retriever,
     query: str,
