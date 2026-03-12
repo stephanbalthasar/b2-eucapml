@@ -420,7 +420,7 @@ chat_engine = ChatEngine(
     booklet_retriever=para_retriever,  
     web_retriever=None                 
 )
-feedback_engine = FeedbackEngine(llm=llm)
+feedback_engine = FeedbackEngine(llm=llm, booklet_retriever=para_retriever)
 
 # --- Sidebar controls ---
 with st.sidebar:
