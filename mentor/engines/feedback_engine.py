@@ -1,4 +1,5 @@
 # mentor/engines/feedback_engine.py
+
 from mentor.prompts import (
     build_evaluate_messages,
     build_consistency_rewrite_messages,
@@ -7,8 +8,9 @@ from mentor.prompts import (
 )
 
 class FeedbackEngine:
-    def __init__(self, llm):
+    def __init__(self, llm, booklet_retriever=None):
         self.llm = llm
+        self.booklet_retriever = booklet_retriever  # ParagraphRetriever or None
 
     # -------------------------------------------------------
     # (i) PLAN  ---- CHANGED SIGNATURE ----
