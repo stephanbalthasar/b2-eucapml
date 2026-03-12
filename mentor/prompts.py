@@ -166,3 +166,28 @@ def build_followup_messages(previous_feedback: str,
     )
     return [{"role":"system","content":system},
             {"role":"user","content":user}]
+
+# --- Gate: Should we attach booklet references for this answer? ---
+def build_sources_gate_messages(user_query: str, answer_text: str) -> list[dict]:
+    """
+    Returns messages to classify (YES/NO) whether this answer warrants booklet references.
+    The assistant must output ONLY 'YES' or 'NO'.
+    """
+    system = (
+        "You are a strict classifier. Decide if a legal answer should include references to the EU capital markets law course booklet or other legal sources.\n"
+        "Output ONLY 'YES' or 'NO'. No other words."
+    )
+    user = (
+        "When should sources be shown?\n"
+        "- Show sources for substantive legal analysis, definitions, rule statements, "
+        "  statute or case references, structured guidance, or paragraph-level citations.\n"
+        "- Do NOT show sources for greetings, meta questions (e.g., 'What is your question?'), "
+        "  scheduling/clarifications, or general tutoring encouragement.\n\n"
+        f"USER QUERY:\n{(user_query or '').strip()}\n\n"
+        f"ASSISTANT ANSWER:\n{(answer_text or '').strip()}\n\n"
+        "Answer with ONLY YES or NO."
+    )
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
