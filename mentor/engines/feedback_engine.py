@@ -57,51 +57,75 @@ class FeedbackEngine:
     # (iii) Follow-up questions about the feedback
     # -------------------------------------------------------
 
-
-
-    
     def follow_up_with_history(self, question, context, model, temperature):
-        messages =        )    messages = []
-            if booklet_chunks:
-                block = "Relevant booklet excerpts:\n" + "\n\n".join(f"- {c}" for c in booklet_chunks)
-                messages.append({"role": "system", "content": block})
-    
-        # Inject core context
+        # 0) Base messages (kept)
+        messages = []
         messages.append({"role": "system", "content": f"Student exam answer:\n{context['student_answer']}"})
         messages.append({"role": "system", "content": f"Feedback:\n{context['feedback']}"})
     
-        # Prior chat turns
+        # 1) Retrieve booklet paragraphs using BOTH the follow-up question AND the feedback text
+        booklet_chunks: list[str] = []
+        if getattr(self, "booklet_retriever", None) is not None:
+            try:
+                # A) query by the current follow-up question (user intent right now)
+                _hits_q, chunks_q = fetch_booklet_chunks_for_prompt(
+                    self.booklet_retriever,
+                    question or "",
+                    top_k=15,
+                    # optional: uncomment if you want shorter chunks in the prompt
+                    # truncate_chars=700,
+                )
+    
+                # B) query by the prior feedback text (captures phrasing/terms the LLM answered with)
+                _hits_fb, chunks_fb = fetch_booklet_chunks_for_prompt(
+                    self.booklet_retriever,
+                    (context.get("feedback") or ""),
+                    top_k=15,
+                    # truncate_chars=700,
+                )
+    
+                # C) merge + deduplicate while preserving order; cap to ~12 for prompt brevity
+                merged = []
+                seen = set()
+                for t in (chunks_q + chunks_fb):
+                    if not t: 
+                        continue
+                    if t in seen:
+                        continue
+                    seen.add(t)
+                    merged.append(t)
+                    if len(merged) == 12:
+                        break
+    
+                booklet_chunks = merged
+    
+            except Exception:
+                booklet_chunks = []
+    
+        # 1a) Self-check (temporary debug)
+        print(f"[FE] booklet_chunks: {len(booklet_chunks)}")
+        if booklet_chunks:
+            print("[FE] first chunk:", booklet_chunks[0][:120].replace("\n", " "))
+    
+        # 2) Inject excerpts as a system block (only if we have any)
+        if booklet_chunks:
+            block = "Relevant booklet excerpts:\n" + "\n\n".join(f"- {c}" for c in booklet_chunks)
+            messages.append({"role": "system", "content": block})
+    
+        # 3) Prior chat turns (kept)
         for role, msg in context["history"]:
             messages.append({
                 "role": "user" if role == "student" else "assistant",
                 "content": msg
             })
     
-        # Current question
+        # 4) Current question (kept)
         messages.append({"role": "user", "content": question})
-
-        booklet_chunks: list[str] = []
-        if getattr(self, "booklet_retriever", None) is not None:
-            _, booklet_chunks = fetch_booklet_chunks_for_prompt(
-                self.booklet_retriever,
-                question or "",
-                top_k=15,
-                # optional: enable truncation if your paragraphs are very long
-                # truncate_chars=700,
-            )
-            # mentor/engines/feedback_engine.py (inside follow_up_with_history, after fetch_booklet_chunks_for_prompt)
-        print(f"[FE] booklet_chunks: {len(booklet_chunks)}")
-        if booklet_chunks:
-            print("[FE] first chunk:", booklet_chunks[0][:120].replace("\n", " "))
-
-
     
-        # LLM call
+        # 5) LLM call (kept)
         return self.llm.chat(
             messages=messages,
             model=model,
             temperature=temperature,
-            max_tokens=800
+            max_tokens=800,
         )
-
-        
