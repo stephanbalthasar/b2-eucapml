@@ -1,5 +1,7 @@
 # mentor/engines/chat_engine.py
 from mentor.prompts import build_tutor_messages
+from mentor.rag.supporting_sources_selector import select_supporting_paragraphs
+
 
 class ChatEngine:
     """
