@@ -421,7 +421,7 @@ booklet_retriever = ParagraphRetriever(booklet_index["paragraphs"])
 web_retriever = CuriaEurlexRetriever(lang="EN")  # or "DE"/"FR"
 
 engine = ChatEngine(
-    llm=my_llm,
+    llm=llm,
     booklet_index=booklet_index,
     booklet_retriever=para_retriever,
     web_retriever=web_retriever,
