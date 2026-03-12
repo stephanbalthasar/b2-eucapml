@@ -1,11 +1,11 @@
 # mentor/rag/supporting_sources_selector.py
 from __future__ import annotations
-from typing import List, Dict
+from typing import List, Dict, Tuple, Optional
 import math
 import string
 import numpy as np
 
-# --- local tokenizer: keeps acronyms like MAR / WpHG / ESMA / MiCA ---
+# --- tokenizer: keeps acronyms like MAR / WpHG / ESMA / MiCA ---
 _PUNCT = str.maketrans("", "", string.punctuation)
 
 def _tok_keep_acronyms(text: str) -> set[str]:
@@ -23,10 +23,33 @@ def _tok_keep_acronyms(text: str) -> set[str]:
             out.add(tl)
     return out
 
-def _score_hits_against_answer(answer_text: str,
-                               hits: List[Dict],
-                               *,
-                               booklet_retriever) -> List[tuple[float, Dict]]:
+# --- retrieval helper: pull top_k paragraph candidates for a given text ---
+def _retrieve_top_k(booklet_retriever, query_text: str, top_k: int = 15) -> List[Dict]:
+    """
+    Retrieve top_k paragraph candidates for the given text using the provided retriever.
+    Tries (query, top_k) positional first, then named arguments; returns [] on any error.
+    """
+    if not booklet_retriever or not query_text:
+        return []
+    try:
+        # most retrievers support positional (query, top_k)
+        return booklet_retriever.retrieve(query_text, top_k=top_k) or []
+    except TypeError:
+        try:
+            # some retrievers use named arguments
+            return booklet_retriever.retrieve(query=query_text, top_k=top_k) or []
+        except Exception:
+            return []
+    except Exception:
+        return []
+
+# --- score candidates against the *answer* (embeddings -> lexical fallback) ---
+def _score_hits_against_answer(
+    answer_text: str,
+    hits: List[Dict],
+    *,
+    booklet_retriever,
+) -> List[tuple[float, Dict]]:
     """
     Returns list of (score, hit_dict), sorted desc.
     Prefers embeddings if available; otherwise acronym-aware lexical cosine.
@@ -34,7 +57,7 @@ def _score_hits_against_answer(answer_text: str,
     if not answer_text or not hits:
         return []
 
-    # Try embeddings first (portable: no special kwargs)
+    # Embedding cosine similarity if available
     embedder = getattr(booklet_retriever, "embedder", None)
     if embedder is not None:
         try:
@@ -48,7 +71,7 @@ def _score_hits_against_answer(answer_text: str,
             scored.sort(key=lambda x: x[0], reverse=True)
             return scored
         except Exception:
-            # Fall back to lexical
+            # Fall back to lexical if embedding path fails for any reason
             pass
 
     # Lexical fallback: binary-cosine on acronym-aware tokens
@@ -63,31 +86,44 @@ def _score_hits_against_answer(answer_text: str,
     scored.sort(key=lambda x: x[0], reverse=True)
     return scored
 
-def select_supporting_paragraphs(answer_text: str,
-                                 hits: List[Dict],
-                                 *,
-                                 booklet_retriever,
-                                 max_n: int = 5) -> List[str]:
+def select_supporting_paragraphs(
+    answer_text: str,
+    hits: Optional[List[Dict]] = None,
+    *,
+    booklet_retriever,
+    max_n: int = 5,
+    top_k: int = 15,
+) -> List[str]:
     """
     Return 0..5 paragraph numbers that are meaningfully related to the *answer*.
-    Uses mode-specific minimum similarity thresholds and a relative gap test.
+
+    Behavior:
+      - If 'hits' is provided: re-score these candidates against the answer (legacy behavior).
+      - If 'hits' is None:     first retrieve top_k candidates using the *answer_text* as the query,
+                               then score and select 0..5.
 
     Parameters
     ----------
     answer_text : str
         The model's answer text (we select paragraphs that support this).
-    hits : list[dict]
-        The 15 candidate paragraph dicts you already retrieved.
+    hits : list[dict] | None
+        Optional list of pre-retrieved candidates. If None, this function will retrieve for you.
     booklet_retriever : ParagraphRetriever
-        The same retriever you use elsewhere (may or may not have an embedder).
+        The retriever to use (may or may not expose an 'embedder').
     max_n : int
-        Cap on number of paragraph numbers to return.
+        Cap on number of paragraph numbers to return (default 5).
+    top_k : int
+        Number of candidates to retrieve *if* hits is None (default 15).
 
     Returns
     -------
     list[str]
         Paragraph numbers as strings, or [] if nothing clears the gates.
     """
+    # If no candidates were supplied, retrieve them using the *answer* as the query.
+    if hits is None:
+        hits = _retrieve_top_k(booklet_retriever, answer_text, top_k=top_k)
+
     ranked = _score_hits_against_answer(answer_text, hits, booklet_retriever=booklet_retriever)
     if not ranked:
         return []
@@ -96,7 +132,7 @@ def select_supporting_paragraphs(answer_text: str,
     top_score, top_hit = ranked[0]
     mode = top_hit.get("_sim_mode", "lex")
 
-    # Absolute + relative gates (same as before; tune if needed)
+    # Absolute + relative gates (conservative thresholds)
     # - Embedding mode: top >= 0.28 and (top - median) >= 0.08
     # - Lexical mode:   top >= 0.14 and (top - median) >= 0.05
     scores = [s for s, _ in ranked]
@@ -108,6 +144,7 @@ def select_supporting_paragraphs(answer_text: str,
 
     # Per-item collection floor to avoid tail picks
     floor = 0.20 if mode == "embed" else 0.10
+
     out: List[str] = []
     seen = set()
     for s, h in ranked:
