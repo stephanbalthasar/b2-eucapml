@@ -128,19 +128,24 @@ class FeedbackEngine:
             gate_txt = gate_raw if isinstance(gate_raw, str) else str(gate_raw)
             show_sources = gate_txt.strip().upper().startswith("YES")
         except Exception:
-            show_sources = False  # conservative
+            gate_txt, show_sources = "EXC", False  # conservative + defined for debug
+        
         # --- VERY SMALL STREAMLIT DEBUG (Step 1): show gate result in the sidebar ---
-        import streamlit as st
-        st.sidebar.write(f"[FE] gate raw: {gate_txt!r}")
-        st.sidebar.write(f"[FE] gate parsed: show_sources={show_sources}")
+        try:
+            import streamlit as st
+            st.sidebar.write(f"[FE] gate raw: {gate_txt!r}")
+            st.sidebar.write(f"[FE] gate parsed: show_sources={show_sources}")
+        except Exception:
+            # If Streamlit isn't available (e.g., running unit tests), ignore
+            pass
         # ---------------------------------------------------------------------------
-    
+        
         # 7) If YES, run the answer-driven selector (no hits passed => retrieve by answer_text)
         if show_sources and getattr(self, "booklet_retriever", None) is not None:
             try:
                 picked = select_supporting_paragraphs(
                     answer_text=reply_text,
-                    hits=None,  # selector retrieves with answer_text as query
+                    hits=None,                  # selector retrieves with answer_text as query
                     booklet_retriever=self.booklet_retriever,
                     top_k=15,
                     max_n=5,
@@ -149,6 +154,6 @@ class FeedbackEngine:
                     reply_text += "\n\n---\n" + "_Key paragraphs: " + ", ".join(picked) + "._"
             except Exception:
                 pass
-    
+        
         # 8) Return a plain string (no trailing comma)
         return reply_text
