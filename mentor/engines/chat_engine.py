@@ -59,35 +59,9 @@ class ChatEngine:
             hits = sum(k in t for k in meta_kw)
             return short and hits >= 2
         
-            # 1) Embeddings
-            embedder = getattr(self.booklet_retriever, "embedder", None)
-            if embedder is not None:
-                try:
-                    p_texts = [h.get("text", "") for h in hits]
-                    P = embedder.encode(p_texts)
-                    P = P / (np.linalg.norm(P, axis=1, keepdims=True) + 1e-12)
-                    a = embedder.encode([answer_text])[0]
-                    a = a / (np.linalg.norm(a) + 1e-12)
-                    sims = P @ a
-                    scored = [(float(sims[i]), {**hits[i], "_sim_mode": "embed"}) for i in range(len(hits))]
-                    scored.sort(key=lambda x: x[0], reverse=True)
-                    return scored
-                except Exception:
-                    pass  # fall back
-    
-            # 2) Lexical fallback (binary-cosine)
-            import math
-            aw = _tok_keep_acronyms(answer_text)
-            scored = []
-            for h in hits:
-                hw = _tok_keep_acronyms(h.get("text", ""))
-                overlap = len(aw & hw)
-                denom = math.sqrt(max(len(aw), 1) * max(len(hw), 1))
-                score = overlap / denom if denom else 0.0
-                scored.append((score, {**h, "_sim_mode": "lex"}))
-            scored.sort(key=lambda x: x[0], reverse=True)
-            return scored
-          
+            # 1) Embeddings (moved to sources selector)
+            # 2) Lexical fallback (binary-cosine) (moved to sources selector)
+                      
         # 1) Simple keyword extraction (existing logic)
         keywords = self._extract_keywords(user_query)
     
