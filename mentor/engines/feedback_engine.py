@@ -129,6 +129,11 @@ class FeedbackEngine:
             show_sources = gate_txt.strip().upper().startswith("YES")
         except Exception:
             show_sources = False  # conservative
+        # --- VERY SMALL STREAMLIT DEBUG (Step 1): show gate result in the sidebar ---
+        import streamlit as st
+        st.sidebar.write(f"[FE] gate raw: {gate_txt!r}")
+        st.sidebar.write(f"[FE] gate parsed: show_sources={show_sources}")
+        # ---------------------------------------------------------------------------
     
         # 7) If YES, run the answer-driven selector (no hits passed => retrieve by answer_text)
         if show_sources and getattr(self, "booklet_retriever", None) is not None:
