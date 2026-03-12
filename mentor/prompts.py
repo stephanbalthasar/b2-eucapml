@@ -87,20 +87,6 @@ def build_plan_messages(case_text: str,
     return [{"role": "system", "content": system},
             {"role": "user",   "content": user}]
 
-def build_followup_messages(previous_feedback: str, followup_question: str,
-                            max_words: int = FOLLOWUP_MAX_WORDS) -> list[dict]:
-    system = (
-        "You answer follow‑up questions about previous feedback. Be precise, "
-        f"≤ {max_words} words. If something depends on facts, say what you would check."
-    )
-    user = (
-        f"PREVIOUS FEEDBACK:\n\"\"\"{(previous_feedback or '').strip()}\"\"\"\n\n"
-        f"STUDENT'S FOLLOW‑UP QUESTION:\n{(followup_question or '').strip()}\n\n"
-        "Answer clearly. If the student asks for the model answer, politely refuse and re‑explain the principle."
-    )
-    return [{"role": "system", "content": system},
-            {"role": "user",   "content": user}]
-
 # --- General tutor chat (booklet-grounded) ---
 
 # mentor/prompts.py
@@ -167,7 +153,6 @@ def build_followup_messages(previous_feedback: str,
     return [{"role":"system","content":system},
             {"role":"user","content":user}]
 
-# --- Gate: Should we attach booklet references for this answer? ---
 # --- Gate: Should we attach booklet references for this answer? ---
 def build_sources_gate_messages(user_query: str, answer_text: str) -> list[dict]:
     """
