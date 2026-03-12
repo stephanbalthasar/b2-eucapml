@@ -452,6 +452,18 @@ with st.sidebar:
         st.cache_data.clear()
         st.success("Re-loaded. Re-run the action to use the latest JSON.")
 
+    # --- FE diagnostics (persisted across reruns) ---
+    dbg = st.session_state.get("fe_debug")
+    if dbg:
+        st.divider()
+        st.caption("Follow‑up engine (debug)")
+        st.write(f"booklet_chunks_in_prompt: {dbg.get('booklet_chunks_in_prompt')}")
+        st.write(f"gate_raw: {repr(dbg.get('gate_raw'))}")
+        st.write(f"gate_parsed: {dbg.get('gate_parsed')}")
+        st.write(f"sources_selected: {dbg.get('sources_selected')}")
+        if dbg.get("picked"):
+            st.write(f"picked: {', '.join(dbg['picked'])}")
+
 # --- Tabs: Feedback + Tutor chat ---
 tab_feedback, tab_chat = st.tabs(["📝 Sample Exam Cases", "💬 General Chat"])
 
