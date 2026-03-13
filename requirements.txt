@@ -8,3 +8,4 @@ sentence-transformers>=2.7
 pandas>=2.2
 python-docx
 python-dotenv>=1.0
+duckduckgo-search
