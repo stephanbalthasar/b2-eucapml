@@ -1,9 +1,11 @@
 # mentor/booklet/retriever.py
 # Lightweight retrievers for paragraphs and chapters.
-# Uses keyword overlap by default; can switch to embeddings if you pass an encoder with .encode()
+# Default: acronym-aware lexical scoring; switches to embeddings if an encoder with .encode() is provided.
+# NEW: Built‑in relevance gate so callers receive only meaningful hits (or [] if nothing is relevant).
 
 from __future__ import annotations
-from typing import List, Dict, Tuple
+
+from typing import List, Dict, Tuple, Optional
 import numpy as np
 import string
 
@@ -39,35 +41,156 @@ class ParagraphRetriever:
     def __init__(self, paragraphs: list[dict], embedder=None):
         """
         paragraphs: [{'para_num', 'text', 'chapter_num', 'chapter_title'}, ...]
-        embedder: optional, must implement .encode(list[str]) -> array
+        embedder: optional, must implement .encode(list[str], ...) -> np.ndarray
+                  If provided, we build normalized paragraph embeddings for cosine similarity.
         """
         self.paragraphs = paragraphs
         self.embedder = embedder
         self._emb = None
         if embedder:
-            texts = [p["text"] for p in paragraphs]
+            texts = [p.get("text", "") for p in paragraphs]
+            # Expectation: the encoder supports normalize_embeddings=True.
+            # If not, we will normalize below defensively.
             self._emb = embedder.encode(texts, normalize_embeddings=True)
 
-    def retrieve(self, query: str, top_k: int = 15, **kwargs) -> list[dict]:
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 15,
+        *,
+        # relevance gate (defaults mirror the supporting_sources_selector thresholds)
+        gate: bool = True,
+        min_abs: Optional[float] = None,
+        min_gap: Optional[float] = None,
+        floor: Optional[float] = None,
+        require_anchor: bool = True,
+        **kwargs,
+    ) -> list[dict]:
+        """
+        Return up to top_k paragraph dicts ranked by relevance to `query`.
+
+        Scoring:
+          - If an embedder is available: cosine similarity (paragraphs pre-encoded).
+          - Otherwise: acronym-aware lexical score (binary-cosine on tokens).
+
+        Gate (when gate=True, default):
+          - Determine mode from scoring (embed vs. lex).
+          - Apply absolute + relative thresholds to the TOP score; if weak, return [].
+          - Keep only items above a per-item floor.
+          - require_anchor=True: each kept paragraph must share at least 1 token with the query.
+
+        Back-compat:
+          - Set gate=False to get legacy "raw top_k" behavior with no filtering.
+
+        Parameters
+        ----------
+        query : str
+        top_k : int
+        gate : bool
+        min_abs, min_gap, floor : Optional[float]
+            Override thresholds if you need custom tuning per-call.
+        require_anchor : bool
+            If True (default), require at least 1 shared token with the query.
+
+        Returns
+        -------
+        list[dict]
+        """
         if not self.paragraphs:
             return []
+        if not (query or "").strip():
+            # Empty/whitespace query yields no meaningful retrieval
+            return []
 
-        # Keyword-overlap fallback (now preserves acronyms like MAR / WpHG / ESMA / MiCA)
-        if self._emb is None:
-            q_words = _tokenize_keep_acronyms(query)
-            scored: list[tuple[int, dict]] = []
+        # ------------------------------
+        # A) Scoring (embed -> lexical)
+        # ------------------------------
+        mode = "embed" if self._emb is not None else "lex"
+        q_words = _tokenize_keep_acronyms(query)
+
+        if mode == "embed":
+            # Embedding cosine similarity
+            qv = self.embedder.encode([query], normalize_embeddings=True)[0]
+            # Some encoders may ignore normalize_embeddings; normalize defensively.
+            q_norm = np.linalg.norm(qv) + 1e-12
+            qv = qv / q_norm
+
+            P = self._emb
+            if P is None:
+                # Fallback if embeddings were not built for some reason
+                mode = "lex"
+            else:
+                # Ensure paragraph vectors are normalized (just in case).
+                P = P / (np.linalg.norm(P, axis=1, keepdims=True) + 1e-12)
+                sims = np.dot(P, qv)  # cosine similarities
+                order = np.argsort(sims)[::-1]
+                ranked: list[tuple[float, dict]] = [(float(sims[i]), self.paragraphs[i]) for i in order]
+        if mode == "lex":
+            # Lexical fallback: acronym-aware binary-cosine
+            scored: list[tuple[float, dict]] = []
             for p in self.paragraphs:
-                p_words = _tokenize_keep_acronyms(p["text"])
-                overlap = len(q_words & p_words)
-                scored.append((overlap, p))
+                p_words = _tokenize_keep_acronyms(p.get("text", ""))
+                denom = max(1.0, (len(q_words) * len(p_words)) ** 0.5)
+                score = len(q_words & p_words) / denom
+                scored.append((score, p))
             scored.sort(key=lambda x: x[0], reverse=True)
-            return [p for score, p in scored[:top_k]]
+            ranked = scored
 
-        # Embedding similarity (unchanged)
-        qv = self.embedder.encode([query], normalize_embeddings=True)[0]
-        sims = np.dot(self._emb, qv)
-        idx = np.argsort(sims)[::-1][:top_k]
-        return [self.paragraphs[i] for i in idx]
+        # ----------------------------------------
+        # B) Optional relevance gate (embed/lex)
+        # ----------------------------------------
+        if not gate:
+            # Legacy behavior: return top_k as-is
+            return [p for s, p in ranked[:top_k]]
+
+        if not ranked:
+            return []
+
+        scores = [s for s, _ in ranked]
+        top = float(scores[0])
+        med = float(np.median(scores))
+
+        # Defaults mirror the selector thresholds (kept conservative)
+        if mode == "embed":
+            # If caller didn't pass overrides, use these:
+            if min_abs is None:
+                min_abs = 0.28
+            if min_gap is None:
+                min_gap = 0.08
+            if floor is None:
+                floor = 0.20
+        else:
+            if min_abs is None:
+                min_abs = 0.14
+            if min_gap is None:
+                min_gap = 0.05
+            if floor is None:
+                floor = 0.10
+
+        # Absolute + relative gates: if the best match is weak, return no booklet context
+        if (top < float(min_abs)) or ((top - med) < float(min_gap)):
+            return []
+
+        # Distinctive-token anchor: require at least 1 shared token with query
+        def _passes_anchor(p_text: str) -> bool:
+            if not require_anchor:
+                return True
+            if not q_words:
+                return True
+            return len(q_words & _tokenize_keep_acronyms(p_text)) >= 1
+
+        # Keep only items above the per-item floor, honoring anchor, then clamp to top_k
+        filtered: list[dict] = []
+        for s, p in ranked:
+            if s < float(floor):
+                continue
+            if not _passes_anchor(p.get("text", "")):
+                continue
+            filtered.append(p)
+            if len(filtered) == top_k:
+                break
+
+        return filtered
 
 
 class ChapterRetriever:
@@ -79,54 +202,57 @@ class ChapterRetriever:
         self.embedder = embedder
         self._emb = None
         if embedder:
-            texts = [c["text"] for c in chapters]
+            texts = [c.get("text", "") for c in chapters]
             self._emb = embedder.encode(texts, normalize_embeddings=True)
 
     def retrieve_best(self, query: str):
         if not self.chapters:
             return None
         if self._emb is None:
-            # (kept as-is; paragraph-level fix already addresses the core issue)
+            # (kept as-is; paragraph-level gate already addresses the core issue)
             q_words = set(w.lower() for w in query.split() if len(w) > 3)
             best, best_score = None, -1
             for c in self.chapters:
-                c_words = set(c["text"].lower().split())
+                c_words = set((c.get("text", "")).lower().split())
                 sc = len(q_words & c_words)
                 if sc > best_score:
                     best_score = sc
                     best = c
             return best
         qv = self.embedder.encode([query], normalize_embeddings=True)[0]
-        sims = np.dot(self._emb, qv)
+        qv = qv / (np.linalg.norm(qv) + 1e-12)
+        P = self._emb / (np.linalg.norm(self._emb, axis=1, keepdims=True) + 1e-12)
+        sims = np.dot(P, qv)
         best_idx = int(np.argmax(sims))
         return self.chapters[best_idx]
+
 
 def fetch_booklet_chunks_for_prompt(
     retriever,
     query: str,
     *,
     top_k: int = 15,
-    truncate_chars: int | None = None,
+    truncate_chars: Optional[int] = None,
 ) -> Tuple[List[Dict], List[str]]:
     """
-    Reuse the ChatEngine pattern:
-      - call retriever.retrieve(query, top_k=15)
+    Helper to:
+      - call retriever.retrieve(query, top_k=..., gate=True)
       - normalize to a list[str] for the prompt
-      - optionally truncate long paragraphs (kept off by default)
+      - optionally truncate long paragraphs
 
     Returns:
-      (hits, booklet_chunks)
-        hits: original list[dict] items from the retriever
-        booklet_chunks: list[str] derived from 'text' fields (optionally truncated)
+      hits           : original list[dict] items from the retriever
+      booklet_chunks : list[str] derived from 'text' fields (optionally truncated)
     """
     hits: List[Dict] = []
     try:
         if hasattr(retriever, "retrieve"):
             try:
-                hits = retriever.retrieve(query, top_k=top_k) or []
+                # Use gated retrieval by default to avoid irrelevant noise in prompts
+                hits = retriever.retrieve(query, top_k=top_k, gate=True) or []
             except TypeError:
                 # supports retrievers that use named arguments
-                hits = retriever.retrieve(query=query, top_k=top_k) or []
+                hits = retriever.retrieve(query=query, top_k=top_k, gate=True) or []
     except Exception:
         hits = []
 
@@ -138,4 +264,5 @@ def fetch_booklet_chunks_for_prompt(
         if truncate_chars and len(t) > truncate_chars:
             t = t[:truncate_chars] + "…"
         chunks.append(t)
+
     return hits, chunks
