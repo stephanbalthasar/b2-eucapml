@@ -87,49 +87,80 @@ def build_plan_messages(case_text: str,
     return [{"role": "system", "content": system},
             {"role": "user",   "content": user}]
 
-# --- General tutor chat (booklet-grounded) ---
-
+# --- General tutor chat (grounded with safe fallback and controlled augmentation) ---
 SYSTEM_TUTOR = (
-    "You are a helpful EU/German capital markets law tutor. "
-    "Use the provided booklet excerpts and web snippets (if present) as context. "
-    "Add general background from your own knowledge. "
-    "Do NOT invent or embellish legal authorities: never fabricate case names, paragraph numbers, or citations. "
-    "If no concrete legal question is asked, ask the user to provide one and stop. "
-    "Prefer short legal citations (e.g., “MAR Art. 17”) only when they appear in the provided excerpts/snippets."
+    "You are a helpful EU/German capital markets law tutor.\n"
+    "\n"
+    "GROUNDING & FALLBACK RULES (must follow):\n"
+    "• If booklet excerpts and/or web snippets are provided (GROUNDED mode), treat them as the PRIMARY evidence. Rely on them first and avoid claims that are not supported by them.\n"
+    "• In GROUNDED mode you MAY add brief, non‑authoritative background to connect the dots (definitions, short context), but you MUST NOT introduce new authorities (no new cases, statutes, paragraph numbers, or pinpoint citations) that are not present in the provided context. Never contradict the excerpts/snippets; if they diverge from common background, defer to them or flag the mismatch succinctly.\n"
+    "• If neither booklet excerpts nor web snippets are provided (UNGROUNDED mode), still answer with a concise general background from your own knowledge and CLEARLY prefix the first line with: 'General background (no booklet/web):'. Do NOT invent case numbers, paragraph numbers, or citations. Offer to search official sources (EUR‑Lex/CURIA/ESMA/BaFin) if the user wants grounded references.\n"
+    "\n"
+    "STYLE:\n"
+    "• Be clear and compact by default (≈3–5 sentences or 3–5 bullets).\n"
+    "• If no concrete legal question is asked, request one and stop.\n"
+    "• Never fabricate authorities; never imply you saw sources you were not given.\n"
 )
-
 def build_tutor_messages(
     user_query: str,
     booklet_chunks: list[str],
     web_snippets: list[str],
-    conversation_preamble: str | None = None
+    conversation_preamble: str | None = None,
+    *,
+    # Optional: if you later pass a retrieval score gap (e.g., top - median),
+    # we will use it to decide STRONG vs WEAK. If None, we fall back to counts.
+    similarity_gap_hint: float | None = None,
 ) -> list[dict]:
     """
     Centralized prompt for the general tutor chat.
     - conversation_preamble: compact transcript (optional)
     - booklet_chunks: up to 15 snippets (already trimmed by the engine)
-    - web_snippets: up to 4 snippets (not used in your app yet, but supported)
+    - web_snippets: up to 4 snippets
+    - similarity_gap_hint: optional float (e.g., top_score - median_score from retriever)
     """
+
+    # --- Conversation preamble (optional) ---
     convo_block = (
         f"Conversation so far (most recent last):\n{conversation_preamble}\n\n"
         if conversation_preamble else ""
     )
+
+    # --- Grounding mode & simple strength heuristic ---
+    has_booklet = bool(booklet_chunks)
+    has_web = bool(web_snippets)
+    grounding_mode = "GROUNDED" if (has_booklet or has_web) else "UNGROUNDED"
+
+    # Effective counts (your builder slices to these limits anyway)
+    b_count = min(len(booklet_chunks or []), 15)
+    w_count = min(len(web_snippets or []), 4)
+
+    # Tiny rule for CONTEXT STRENGTH:
+    # 1) If a similarity gap hint is provided, treat >=0.08 as STRONG, else WEAK.
+    # 2) Otherwise, counts-based default:
+    #    STRONG if (b_count >= 8) or (w_count >= 2); else WEAK.
+    if similarity_gap_hint is not None:
+        context_strength = "STRONG" if float(similarity_gap_hint) >= 0.08 else "WEAK"
+    else:
+        context_strength = "STRONG" if (b_count >= 8 or w_count >= 2) else "WEAK"
+
+    # --- Material blocks ---
     booklet_block = "\n\n".join(f"- {c}" for c in (booklet_chunks or [])[:15]) or "None"
     web_block = "\n\n".join(f"- {s}" for s in (web_snippets or [])[:4]) or "None"
 
+    # --- User content with explicit mode/strength line ---
     user_content = (
         f"{convo_block}"
+        f"GROUNDING MODE: {grounding_mode}    CONTEXT STRENGTH: {context_strength}\n\n"
         f"USER QUERY:\n{user_query}\n\n"
         f"RELEVANT BOOKLET EXCERPTS:\n{booklet_block}\n\n"
         f"RELEVANT WEB SNIPPETS:\n{web_block}\n\n"
-        "Please answer clearly and concisely."
+        "Please answer clearly and concisely. Follow the GROUNDING & FALLBACK RULES from the system message.\n"
     )
+
     return [
         {"role": "system", "content": SYSTEM_TUTOR},
         {"role": "user", "content": user_content},
     ]
-
-# mentor/prompts.py  (extend your existing follow-up builder)
 
 def build_followup_messages(previous_feedback: str,
                             followup_question: str,
