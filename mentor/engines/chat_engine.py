@@ -1,6 +1,6 @@
 # mentor/engines/chat_engine.py
 import streamlit as st
-from mentor.prompts import build_tutor_messages, build_sources_gate_messages
+from mentor.prompts import build_tutor_messages, build_freeform_messages, build_sources_gate_messages
 from mentor.rag.supporting_sources_selector import select_supporting_paragraphs
 
 class ChatEngine:
@@ -142,7 +142,36 @@ class ChatEngine:
             }
         except Exception:
             pass
-
+        # --- ROUTING: choose prompt based on whether we have any context ---
+        use_freeform = not booklet_chunks and not web_snippets
+        
+        if use_freeform:
+            # Minimal, permissive prompt (no negative priming) – uses general knowledge safely
+            messages = build_freeform_messages(
+                user_query=user_query,
+                conversation_preamble=conversation_preamble,
+                max_sentences=6,   # keep answers crisp
+            )
+            # (Optional) expose in Streamlit so you can see which mode ran
+            try:
+                import streamlit as st
+                st.session_state["__chat_mode__"] = "FREEFORM"
+            except Exception:
+                pass
+        else:
+            # Normal grounded tutor prompt (uses booklet/web as primary evidence)
+            messages = build_tutor_messages(
+                user_query=user_query,
+                booklet_chunks=booklet_chunks,
+                web_snippets=web_snippets,
+                conversation_preamble=conversation_preamble,
+                # similarity_gap_hint=top_minus_median  # if you compute this; otherwise omit
+            )
+            try:
+                import streamlit as st
+                st.session_state["__chat_mode__"] = "TUTOR"
+            except Exception:
+                pass
         
         messages = self._build_prompt(
             user_query=user_query,
