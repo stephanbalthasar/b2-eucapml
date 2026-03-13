@@ -1,7 +1,14 @@
 # mentor/engines/chat_engine.py
+
 import streamlit as st
-from mentor.prompts import build_tutor_messages, build_freeform_messages, build_sources_gate_messages
+
+from mentor.prompts import (
+    build_tutor_messages,
+    build_freeform_messages,
+    build_sources_gate_messages,
+)
 from mentor.rag.supporting_sources_selector import select_supporting_paragraphs
+
 
 class ChatEngine:
     """
@@ -9,14 +16,14 @@ class ChatEngine:
     - Take user query
     - Find relevant booklet parts
     - Optionally find relevant web snippets
-    - Ask LLM to answer grounded in those
+    - Ask LLM to answer (grounded when context exists; freeform otherwise)
     """
 
     def __init__(self, llm, booklet_index, booklet_retriever, web_retriever=None):
         self.llm = llm
         self.booklet_index = booklet_index
         self.booklet_retriever = booklet_retriever  # Prefer ParagraphRetriever
-        self.web_retriever = web_retriever  # may be None for now
+        self.web_retriever = web_retriever          # May be None
 
     def _should_show_sources(self, user_query: str, reply_text: str, *, model: str) -> bool:
         """
@@ -27,8 +34,8 @@ class ChatEngine:
         try:
             res = self.llm.chat(messages=messages, model=model, temperature=0.0, max_tokens=4)
             text = res if isinstance(res, str) else str(res)
-            out = text.strip().upper()
-            # accept minimal variants; keep this small to stay deterministic
+            out = (text or "").strip().upper()
+            # Accept minimal variants; keep this small to stay deterministic.
             if out.startswith("YES"):
                 return True
             if out.startswith("NO"):
@@ -38,45 +45,35 @@ class ChatEngine:
         # Fallback: conservative (no sources) if the gate fails
         return False
 
-    def answer(self, user_query, *, model, temperature, max_tokens=800, conversation_preamble=None):
+    def answer(
+        self,
+        user_query,
+        *,
+        model,
+        temperature,
+        max_tokens=800,
+        conversation_preamble=None
+    ):
         """
         Generates an answer and then selects 0..5 booklet paragraphs that are
         meaningfully related to the *answer* (not the question).
         Only appends a footer if at least one paragraph clears a minimum similarity.
         """
-        import string, math
-        import numpy as np
-    
-        # ---------- local helpers (self-contained) ----------
-        def _tok_keep_acronyms(text: str) -> set[str]:
-            import string
-            if not text:
-                return set()
-            punct_table = str.maketrans("", "", string.punctuation)
-            toks = text.translate(punct_table).split()
-            out = set()
-            for tok in toks:
-                upper_count = sum(1 for ch in tok if ch.isupper())
-                if 2 <= len(tok) <= 8 and upper_count >= 2:
-                    out.add(tok.lower()); continue
-                tl = tok.lower()
-                if len(tl) > 3:
-                    out.add(tl)
-            return out
-                          
-        # 1) Simple keyword extraction (existing logic)
+
+        # ---------- 1) Keyword extraction (kept minimal) ----------
         keywords = self._extract_keywords(user_query)
-    
-        # 2) Retrieve booklet context (prefer ParagraphRetriever)
+
+        # ---------- 2) Retrieve booklet context (prefer ParagraphRetriever) ----------
         hits = []
         try:
             if hasattr(self.booklet_retriever, "retrieve"):
+                # ParagraphRetriever path (embedding or lexical, with your gate)
                 hits = self.booklet_retriever.retrieve(user_query, top_k=15) or []
             elif hasattr(self.booklet_retriever, "retrieve_best"):
                 # Back-compat: ChapterRetriever branch
                 chapter = self.booklet_retriever.retrieve_best(user_query)
                 if chapter and isinstance(chapter, dict):
-                    from mentor.rag.booklet_retriever import ParagraphRetriever  # your current path
+                    from mentor.rag.booklet_retriever import ParagraphRetriever  # local import to avoid cycles
                     chapter_num = chapter.get("chapter_num")
                     chapter_paras = [
                         p for p in (self.booklet_index.get("paragraphs") or [])
@@ -86,9 +83,12 @@ class ChatEngine:
                         pr = ParagraphRetriever(chapter_paras)
                         hits = pr.retrieve(user_query, top_k=15) or []
                     else:
+                        # Fallback: split the chapter text into paras
                         text = chapter.get("text", "")
                         paras = [t.strip() for t in text.split("\n\n") if t.strip()]
                         hits = [{"text": t} for t in paras[:15]]
+                else:
+                    hits = []
             else:
                 # Generic fallback (avoid passing unsupported kwargs)
                 try:
@@ -97,14 +97,14 @@ class ChatEngine:
                     hits = self.booklet_retriever.retrieve(query=user_query, top_k=15) or []
         except Exception:
             hits = []
-    
+
         # Normalize to list[str] for prompt
         booklet_chunks = [
             (h.get("text") if isinstance(h, dict) else str(h))
             for h in hits if h
         ]
-    
-        # 3) Optional web retrieval (kept off unless web_retriever is set)
+
+        # ---------- 3) Optional web retrieval ----------
         web_snippets = []
         if self.web_retriever is not None:
             try:
@@ -115,24 +115,23 @@ class ChatEngine:
                 ) or []
             except Exception:
                 web_snippets = []
-            # after web retrieval succeeds or errors are handled
+
+        # Expose web retrieval debug in Streamlit
         if isinstance(web_snippets, list):
-            # quick debug so you can see what came back in Streamlit
             st.session_state["__web_snippets_debug__"] = {
                 "query": user_query,
                 "snippets": web_snippets[:4],
                 "count": len(web_snippets),
             }
-    
-        # 4) Build messages for LLM
-        # Compute how many will actually go into the prompt (builder slices)
+
+        # ---------- 4) Prompt-source counts (for your sidebar) ----------
         booklet_used = min(len(booklet_chunks or []), 15)  # tutor prompt uses [:15]
-        web_used     = min(len(web_snippets or []), 4)     # tutor prompt uses [:4]
-        # Console log (server)
-        print(f"[ChatEngine] Prompt sources -> booklet_chunks_used={booklet_used} "
-              f"(retrieved={len(booklet_chunks or [])}), "
-              f"web_snippets_used={web_used} (retrieved={len(web_snippets or [])})")
-        # Also expose in Streamlit's session state for sidebar display
+        web_used = min(len(web_snippets or []), 4)         # tutor prompt uses [:4]
+        print(
+            f"[ChatEngine] Prompt sources -> booklet_chunks_used={booklet_used} "
+            f"(retrieved={len(booklet_chunks or [])}), "
+            f"web_snippets_used={web_used} (retrieved={len(web_snippets or [])})"
+        )
         try:
             st.session_state["__prompt_source_counts__"] = {
                 "booklet_used": booklet_used,
@@ -142,19 +141,18 @@ class ChatEngine:
             }
         except Exception:
             pass
-        # --- ROUTING: choose prompt based on whether we have any context ---
+
+        # ---------- 5) ROUTING: choose prompt based on whether we have any context ----------
         use_freeform = not booklet_chunks and not web_snippets
-        
+
         if use_freeform:
             # Minimal, permissive prompt (no negative priming) – uses general knowledge safely
             messages = build_freeform_messages(
                 user_query=user_query,
                 conversation_preamble=conversation_preamble,
-                max_sentences=6,   # keep answers crisp
+                max_sentences=6,  # keep answers crisp
             )
-            # (Optional) expose in Streamlit so you can see which mode ran
             try:
-                import streamlit as st
                 st.session_state["__chat_mode__"] = "FREEFORM"
             except Exception:
                 pass
@@ -165,59 +163,57 @@ class ChatEngine:
                 booklet_chunks=booklet_chunks,
                 web_snippets=web_snippets,
                 conversation_preamble=conversation_preamble,
-                # similarity_gap_hint=top_minus_median  # if you compute this; otherwise omit
+                # similarity_gap_hint=top_minus_median  # pass if you compute this
             )
             try:
-                import streamlit as st
                 st.session_state["__chat_mode__"] = "TUTOR"
             except Exception:
                 pass
-        
-        messages = self._build_prompt(
-            user_query=user_query,
-            booklet_chunks=booklet_chunks,
-            web_snippets=web_snippets,
-            conversation_preamble=conversation_preamble,
-        )
-    
-        # 5) Ask LLM
-        
+
+        # ---------- 6) Ask the LLM ----------
         result = self.llm.chat(
             messages=messages,
             model=model,
             temperature=temperature,
             max_tokens=max_tokens
         )
-    
-        # Coerce to plain string for display
         reply_text = result if isinstance(result, str) else str(result)
-        # Ask the LLM if sources are appropriate for THIS answer (deterministic gate)
+
+        # If no booklet context was used, return the answer as-is (no 'Key paragraphs' footer)
+        if not booklet_chunks:
+            return reply_text
+
+        # ---------- 7) Should we attach booklet references for THIS answer? ----------
         if not self._should_show_sources(user_query=user_query, reply_text=reply_text, model=model):
             return reply_text
-    
-        # 6) NEW: pick 0..5 supporting paragraph numbers based on the *answer*
+
+        # ---------- 8) Pick 0..5 supporting paragraph numbers based on the *answer* ----------
         selected_para_nums = select_supporting_paragraphs(
             reply_text,
             hits,
             booklet_retriever=self.booklet_retriever,
             max_n=5
         )
-    
+
         # Append footer only if we actually have meaningful support
         if selected_para_nums:
             footer = "\n\n---\n" + "_Key paragraphs: " + ", ".join(selected_para_nums) + "._"
             reply_text += footer
-    
+
         return reply_text
 
-    # -------- helpers (kept) --------------------
+    # -------- helpers (kept minimal) --------------------
+
     def _extract_keywords(self, text):
         # TODO: later include legal keyword extraction
         # For now: split by spaces and take simple tokens
-        return [w.strip() for w in text.split() if len(w) > 3]
+        return [w.strip() for w in (text or "").split() if len(w) > 3]
 
     def _build_prompt(self, user_query, booklet_chunks, web_snippets, conversation_preamble=None):
-        # Single source of truth for tutor prompts
+        """
+        Kept only for backward-compat if other callers use it.
+        (The answer() method builds messages directly.)
+        """
         return build_tutor_messages(
             user_query=user_query,
             booklet_chunks=booklet_chunks,
