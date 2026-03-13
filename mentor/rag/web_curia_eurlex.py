@@ -4,19 +4,18 @@ from __future__ import annotations
 import html
 import io
 import re
-import time
 from typing import List, Dict, Tuple
-from urllib.parse import urlparse, parse_qs, unquote, urljoin
+from urllib.parse import urlparse, unquote
 
 import requests
 
-# Optional HTML parsing (preferred). If bs4 is absent, we fall back to regex.
+# Optional HTML parsing. If bs4 is absent, we fall back to regex stripping.
 try:
     from bs4 import BeautifulSoup  # type: ignore
 except Exception:
-    BeautifulSoup = None  # we will fall back if needed
+    BeautifulSoup = None  # fallback will be used
 
-# Optional PDF text extraction
+# Optional PDF text extraction. If PyPDF2 is absent, we skip PDFs.
 try:
     from PyPDF2 import PdfReader  # type: ignore
 except Exception:
@@ -24,108 +23,195 @@ except Exception:
 
 
 # -----------------------
-# Google + Official sites
+# Config / constants
 # -----------------------
 
 _GOOGLE_SEARCH_URL = "https://www.google.com/search"
 
-# Domains we accept (in this order of preference)
+# Allowed domains (kept small and authoritative)
 _ALLOWED_DOMAINS = ("curia.europa.eu", "eur-lex.europa.eu", "esma.europa.eu")
+
+# Preferred language hint for URLs
+def _is_english_url(u: str) -> bool:
+    u = u.lower()
+    return ("/en/" in u) or u.endswith("en.pdf") or "lang=en" in u or "language=en" in u
 
 
 def _ua() -> str:
-    # A friendly UA reduces blocks in many environments
+    """Minimal UA to reduce blocks in common environments."""
     return (
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/119.0 Safari/537.36"
+        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
     )
 
 
-def _is_english_url(u: str) -> bool:
-    # Prefer English variants in URL path if present
-    u_lower = u.lower()
-    return ("/en/" in u_lower) or u_lower.endswith("en.pdf") or "lang=en" in u_lower
-
+# -----------------------
+# URL classification
+# -----------------------
 
 def _classify(url: str) -> Tuple[int, str]:
     """
-    Priority tuple (smaller is better), and a coarse type label:
-      1 -> CURIA press release
-      2 -> EUR-Lex judgment summary
-      3 -> Judgment text (CURIA/EUR-Lex)
+    Return (priority, label).
+      1 -> CURIA press release (usually cpNNNNxx.pdf)
+      2 -> EUR-Lex judgment summary (_SUM)
+      3 -> Judgment text (EUR-Lex/ CURIA docs)
       4 -> ESMA
-      5 -> Other within allowed domains
+      5 -> Other (still allowed domain)
     """
     u = url.lower()
 
-    # CURIA press releases are often cpNNNNNNen.pdf
-    if "curia.europa.eu" in u and ("cp" in u and u.endswith(".pdf")):
+    # 1) CURIA press release (press PDFs typically named cpNNNNNNen.pdf)
+    if "curia.europa.eu" in u and u.endswith(".pdf") and "/upload/docs/" in u and "/application/pdf/" in u and "cp" in u:
         return (1, "CURIA_PRESS_RELEASE")
 
-    # EUR-Lex summary uses ...CELEX:...._SUM
+    # 2) EUR-Lex summary uses CELEX ... _SUM
+    # e.g., https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:62013CJ0628_SUM
     if "eur-lex.europa.eu" in u and "_sum" in u:
         return (2, "EURLEX_SUMMARY")
 
-    # Judgment text (no _SUM) from EUR-Lex or CURIA
+    # 3) Judgment text (EUR-Lex or CURIA doc pages that are not summary)
     if ("eur-lex.europa.eu" in u or "curia.europa.eu" in u) and (
-        "document" in u or "docid=" in u or "celex:" in u
+        "document" in u or "docid=" in u or "celex:" in u or "/juris/" in u
     ):
         return (3, "JUDGMENT")
 
-    # ESMA (used for general regulatory topics)
+    # 4) ESMA domain (Q&A, guidelines, statements)
     if "esma.europa.eu" in u:
         return (4, "ESMA")
 
-    # Default (still allowed domain)
+    # 5) Other (within allowed domains)
     return (5, "OTHER")
 
 
-def _clean_snippet_text(txt: str, limit: int = 700) -> str:
-    txt = html.unescape(txt or "")
-    txt = re.sub(r"\s+", " ", txt).strip()
-    if len(txt) <= limit:
-        return txt
+# -----------------------
+# Google SERP extraction
+# -----------------------
 
-    # Cut at the nearest sentence boundary not too far before the limit
-    cut = txt[:limit]
-    m = re.search(r"(?s)^(.+?[.!?])(?=\s|$)", cut[::-1])  # reverse search
-    if m:
-        # Reverse back to original
-        boundary_len = len(m.group(1))
-        # index from the start:
-        idx = limit - boundary_len
-        return txt[:idx + boundary_len].strip()
-    return cut.strip()
+def _extract_google_results_html(html_text: str) -> List[str]:
+    """
+    Extract result target URLs from a Google HTML SERP.
+
+    Robust to:
+      - redirect anchors: <a href="/url?q=...">
+      - absolute redirect anchors: <a href="https://www.google.com/url?....">
+      - direct anchors to allowed domains
+    """
+    urls: List[str] = []
+
+    if BeautifulSoup is not None:
+        try:
+            soup = BeautifulSoup(html_text, "html.parser")
+            for a in soup.find_all("a", href=True):
+                href = a["href"]
+
+                # Ignore internal Google links
+                if href.startswith("/search") or "google." in href and "/url?" not in href:
+                    continue
+
+                # 1) Relative redirect pattern: /url?q=<target>&...
+                if href.startswith("/url?"):
+                    m = re.search(r"[?&]q=([^&]+)", href)
+                    if m:
+                        target = unquote(m.group(1))
+                        urls.append(target)
+                        continue
+
+                # 2) Absolute redirect: https://www.google.com/url?....
+                if href.startswith("https://www.google.com/url"):
+                    m = re.search(r"[?&]q=([^&]+)", href)
+                    if m:
+                        target = unquote(m.group(1))
+                        urls.append(target)
+                        continue
+
+                # 3) Direct links (occasionally Google outputs the target directly)
+                if href.startswith("http"):
+                    urls.append(href)
+        except Exception:
+            pass
+
+    # Fallback regex parse if BS4 missing or failed (still permissive)
+    if not urls:
+        # relative /url?q=...
+        for m in re.finditer(r'href="/url\?q=([^"&]+)', html_text or ""):
+            urls.append(unquote(m.group(1)))
+        # direct http(s) links in anchors
+        for m in re.finditer(r'href="(https?://[^"]+)"', html_text or ""):
+            urls.append(unquote(m.group(1)))
+
+    # Remove obvious Google junk and duplicates early
+    cleaned: List[str] = []
+    seen: set[str] = set()
+    for u in urls:
+        if not u.startswith("http"):
+            continue
+        if "google." in u:
+            continue
+        if any(u.startswith(pfx) for pfx in ("https://webcache.googleusercontent.com", "http://webcache.googleusercontent.com")):
+            continue
+        norm = u.split("#")[0]
+        if norm not in seen:
+            seen.add(norm)
+            cleaned.append(norm)
+    return cleaned
 
 
-def _extract_visible_text(html_text: str) -> str:
-    if BeautifulSoup is None:
-        # fallback: rough strip of tags
-        return re.sub(r"<[^>]+>", " ", html_text or "")
+def _filter_rank_urls(urls: List[str], prefer_en: bool) -> List[Tuple[str, int, str, int]]:
+    """
+    Keep allowed domains, classify & rank.
+    Returns list of tuples (url, priority, label, lang_penalty) ordered by (priority, penalty).
+    """
+    ranked: List[Tuple[str, int, str, int]] = []
+    seen: set[str] = set()
 
-    soup = BeautifulSoup(html_text, "html.parser")
+    for u in urls:
+        parsed = urlparse(u)
+        host = parsed.netloc.lower()
+        if not any(host.endswith(dom) for dom in _ALLOWED_DOMAINS):
+            continue
 
-    # EUR‑Lex summary often in main content; CURIA press pages (if HTML) are small.
-    # Heuristic: gather first few meaningful <p> from body (skip nav/footer)
-    body = soup.body or soup
-    paras = []
-    for p in body.find_all("p"):
-        t = p.get_text(strip=True)
-        if t and len(t.split()) > 4:
-            paras.append(t)
-        if len(paras) >= 6:
-            break
-    return " ".join(paras) if paras else soup.get_text(separator=" ", strip=True)
+        # simple de-dupe by normalized URL (strip fragment)
+        norm = u.split("#")[0]
+        if norm in seen:
+            continue
+        seen.add(norm)
+
+        prio, label = _classify(u)
+        penalty = 0
+        if prefer_en and not _is_english_url(u):
+            penalty = 1
+
+        ranked.append((u, prio, label, penalty))
+
+    ranked.sort(key=lambda t: (t[1], t[3]))
+    return ranked
 
 
-def _pdf_to_text(content: bytes) -> str:
-    if not content:
+# -----------------------
+# Fetching & extraction
+# -----------------------
+
+def _http_get(url: str, *, timeout: float) -> Tuple[int, bytes, str]:
+    """Return (status_code, content, content_type)."""
+    try:
+        r = requests.get(
+            url,
+            headers={"User-Agent": _ua(), "Accept": "*/*"},
+            timeout=timeout,
+            allow_redirects=True,
+        )
+        return r.status_code, r.content or b"", r.headers.get("Content-Type", "")
+    except Exception:
+        return 0, b"", ""
+
+
+def _extract_text_from_pdf(content: bytes) -> str:
+    if not content or PdfReader is None:
         return ""
-    if PdfReader is None:
-        return ""  # unable to parse PDFs in this environment
     try:
         reader = PdfReader(io.BytesIO(content))
-        pages = min(2, len(reader.pages))  # first 1-2 pages normally contain the holding
+        # Press releases state the holding up front; 1–2 pages are enough.
+        pages = min(2, len(reader.pages))
         out = []
         for i in range(pages):
             try:
@@ -137,68 +223,56 @@ def _pdf_to_text(content: bytes) -> str:
         return ""
 
 
-def _request(url: str, *, timeout: float = 6.0) -> Tuple[int, bytes, str]:
-    """
-    Return (status_code, content_bytes, content_type)
-    """
-    try:
-        headers = {"User-Agent": _ua(), "Accept": "*/*"}
-        r = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
-        ctype = r.headers.get("Content-Type", "")
-        return r.status_code, r.content, ctype
-    except Exception:
-        return 0, b"", ""
-
-
-def _extract_google_results(html_text: str) -> List[str]:
-    # Parse Google SERP safely: look for '/url?q=' anchors
-    urls: List[str] = []
-    for m in re.finditer(r'href="/url\?q=([^"&]+)', html_text or ""):
-        target = unquote(m.group(1))
-        urls.append(target)
-    return urls
-
-
-def _filter_and_rank(urls: List[str], prefer_lang_en: bool = True) -> List[Tuple[str, int, str, int]]:
-    """
-    Keep only allowed domains, de-duplicate, and rank by:
-      (priority, language_penalty), lower is better.
-    Return tuples: (url, priority, typ, penalty)
-    """
-    seen: set[str] = set()
-    ranked: List[Tuple[str, int, str, int]] = []
-
-    for u in urls:
-        parsed = urlparse(u)
-        host = parsed.netloc.lower()
-        if not any(host.endswith(dom) for dom in _ALLOWED_DOMAINS):
-            continue
-        # de-duplicate by normalized URL
-        norm = u.split("#")[0]
-        if norm in seen:
-            continue
-        seen.add(norm)
-
-        prio, typ = _classify(u)
-        penalty = 0
-        if prefer_lang_en and not _is_english_url(u):
-            penalty = 1  # small penalty for non-EN
-
-        ranked.append((u, prio, typ, penalty))
-
-    ranked.sort(key=lambda t: (t[1], t[3]))
-    return ranked
-
-
-def _extract_text_from_url(url: str, ctype: str, content: bytes) -> str:
-    if "pdf" in ctype.lower() or url.lower().endswith(".pdf"):
-        return _pdf_to_text(content)
-    # HTML-like
+def _extract_text_from_html(content: bytes) -> str:
+    # Try UTF-8 then Latin-1
     try:
         text = content.decode("utf-8", errors="replace")
     except Exception:
         text = content.decode("latin-1", errors="replace")
-    return _extract_visible_text(text)
+
+    if BeautifulSoup is None:
+        # Rough tag strip fallback
+        return re.sub(r"<[^>]+>", " ", text or "")
+
+    soup = BeautifulSoup(text, "html.parser")
+
+    # Heuristics: prefer visible paragraphs in the main body
+    body = soup.body or soup
+    paras: List[str] = []
+
+    # EUR‑Lex summaries often have readable <p> blocks near the top;
+    # CURIA HTML press pages (if any) are also short and <p>-based.
+    for p in body.find_all("p"):
+        t = p.get_text(" ", strip=True)
+        if t and len(t.split()) > 4:
+            paras.append(t)
+        if len(paras) >= 8:
+            break
+
+    if paras:
+        return " ".join(paras)
+
+    # Fallback: all text
+    return soup.get_text(" ", strip=True)
+
+
+def _to_snippet(text: str, *, limit: int = 700) -> str:
+    """Normalize whitespace and trim to <= limit at a sentence boundary if possible."""
+    t = html.unescape(text or "")
+    t = re.sub(r"\s+", " ", t).strip()
+    if len(t) <= limit:
+        return t
+
+    # Try to end near the limit at a sentence boundary within the last 120 chars window
+    window_start = max(0, limit - 120)
+    window = t[window_start:limit]
+    # Look for '.', '!' or '?' followed by space or end
+    matches = list(re.finditer(r"[.!?](?=\s|$)", window))
+    if matches:
+        end = window_start + matches[-1].end()
+        return t[:end].strip()
+
+    return t[:limit].strip()
 
 
 def _lang_from_url(url: str) -> str:
@@ -207,83 +281,105 @@ def _lang_from_url(url: str) -> str:
         return "DE"
     if "/fr/" in u or u.endswith("fr.pdf"):
         return "FR"
-    if "/en/" in u or u.endswith("en.pdf"):
+    if _is_english_url(u):
         return "EN"
     return "EN"  # default
 
 
+# -----------------------
+# Public retriever
+# -----------------------
+
 class CuriaEurlexRetriever:
     """
     Google-first retriever for official EU legal sources (CURIA, EUR-Lex, ESMA).
-    - Queries Google with a site filter.
-    - Keeps the first N hits from allowed domains.
-    - Ranks: CURIA press release > EUR-Lex summary > judgment > ESMA > rest.
-    - Fetches and extracts small, high-quality snippets (<= 700 chars).
-    - Returns up to 'top_k' snippets as list[dict] with keys: text, source_url, source_type, lang.
+
+    • Queries Google with a site filter.
+    • Keeps the first few hits from allowed domains; de-duplicates; prefers EN.
+    • Ranks: CURIA press release > EUR-Lex summary > judgment > ESMA > other.
+    • Fetches each candidate and extracts a compact snippet (<= 700 chars).
+    • Returns up to 'top_k' snippets: List[Dict] with keys: text, source_url, source_type, lang.
     """
 
     def __init__(self, lang: str = "EN", timeout_sec: float = 6.0):
-        self.lang = lang.upper()
+        self.lang = (lang or "EN").upper()
         self.timeout = float(timeout_sec)
 
+    # ---- main API ----
     def retrieve(self, query: str, keywords: List[str] | None = None, top_k: int = 4) -> List[Dict]:
         if not (query or "").strip():
             return []
 
-        # 1) Google with site filters
+        # 1) Google with site filter — first pass (quoted)
         site_filter = "site:eur-lex.europa.eu OR site:curia.europa.eu OR site:esma.europa.eu"
-        q = f'{site_filter} "{query.strip()}"'
+        q1 = f'{site_filter} "{query.strip()}"'
+        urls = self._google_to_urls(q1)
 
-        params = {
-            "q": q,
-            "hl": self.lang.lower(),  # help ranking in the chosen language
-            "num": "10",
-            "safe": "off"
-        }
-        headers = {"User-Agent": _ua(), "Accept": "text/html,*/*"}
+        # If nothing surfaced (e.g., consent page, quoted too strict), try second pass unquoted
+        if not urls:
+            q2 = f"{site_filter} {query.strip()}"
+            urls = self._google_to_urls(q2)
 
-        try:
-            r = requests.get(_GOOGLE_SEARCH_URL, params=params, headers=headers, timeout=self.timeout)
-            html_serp = r.text if r.status_code == 200 else ""
-        except Exception:
-            html_serp = ""
-
-        if not html_serp:
-            return []  # no web fallback in this simple version
-
-        # 2) Extract candidate URLs and rank
-        raw_urls = _extract_google_results(html_serp)
-        ranked = _filter_and_rank(raw_urls, prefer_lang_en=(self.lang == "EN"))
-        if not ranked:
+        if not urls:
             return []
 
-        # 3) Take at most five candidates (your requirement) before fetching
+        # 2) Keep only top 5 candidates (as requested), ranked & EN-preferred
+        ranked = _filter_rank_urls(urls, prefer_en=(self.lang == "EN"))
         candidates = ranked[:5]
 
-        # 4) Fetch pages, extract snippets, and build outputs
+        # 3) Fetch → extract → build snippets
         out: List[Dict] = []
-        for url, prio, typ, penalty in candidates:
-            status, content, ctype = _request(url, timeout=self.timeout)
+        for url, prio, label, penalty in candidates:
+            status, content, ctype = _http_get(url, timeout=self.timeout)
             if status != 200 or not content:
                 continue
 
-            text = _extract_text_from_url(url, ctype, content)
+            if "pdf" in (ctype or "").lower() or url.lower().endswith(".pdf"):
+                text = _extract_text_from_pdf(content)
+            else:
+                text = _extract_text_from_html(content)
+
             if not text:
                 continue
 
-            snippet = _clean_snippet_text(text, limit=700)
-            if not snippet or len(snippet.split()) < 12:
-                # too short -> skip
+            snippet = _to_snippet(text, limit=700)
+            # Require a minimal length so we don't inject noise
+            if len(snippet.split()) < 12:
                 continue
 
             out.append({
                 "text": snippet,
                 "source_url": url,
-                "source_type": typ,
-                "lang": _lang_from_url(url)
+                "source_type": label,
+                "lang": _lang_from_url(url),
             })
 
             if len(out) == top_k:
                 break
 
         return out
+
+    # ---- helpers ----
+    def _google_to_urls(self, full_query: str) -> List[str]:
+        """Run a Google query, parse the HTML, and return a list of target URLs."""
+        try:
+            r = requests.get(
+                _GOOGLE_SEARCH_URL,
+                params={"q": full_query, "hl": self.lang.lower(), "num": "10", "safe": "off"},
+                headers={"User-Agent": _ua(), "Accept": "text/html,*/*"},
+                timeout=self.timeout,
+            )
+            if r.status_code != 200:
+                return []
+            text = r.text or ""
+
+            # Detect consent / unusual-traffic interstitials and bail out (let caller do second pass)
+            if ("consent.google" in text.lower()
+                or "before you continue to google" in text.lower()
+                or "unusual traffic" in text.lower()):
+                return []
+
+            raw_urls = _extract_google_results_html(text)
+            return raw_urls
+        except Exception:
+            return []
