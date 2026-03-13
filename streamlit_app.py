@@ -402,20 +402,28 @@ render_brand_bar_aligned(
 )
 
 # --- Build retrievers once ---
+
 @st.cache_resource(show_spinner=False)
 def get_embedder():
-    # lives in mentor.rag.booklet_retriever (same file as ParagraphRetriever)
     from mentor.rag.booklet_retriever import STEmbedder
-    # Multilingual DE/EN, 768‑d
     return STEmbedder(
         model_name="paraphrase-multilingual-mpnet-base-v2",
-        device="cpu",              # change to "cuda" if you have a GPU
-        normalize_by_model=True,   # let ST normalize + we still normalize defensively
+        device="cpu",
+        normalize_by_model=True,
     )
 
-embedder = get_embedder()
+@st.cache_resource(show_spinner=False)
+def get_para_retriever(paragraphs, model_name: str = "paraphrase-multilingual-mpnet-base-v2"):
+    """
+    Cache the ParagraphRetriever so the paragraph embeddings are computed only once
+    per session (or until caches are cleared).
+    """
+    from mentor.rag.booklet_retriever import ParagraphRetriever
+    embedder = get_embedder()  # already cached above
+    return ParagraphRetriever(paragraphs, embedder=embedder)
 
-para_retriever = ParagraphRetriever(INDEX["paragraphs"], embedder=embedder)
+# use cached retriever
+para_retriever = get_para_retriever(INDEX["paragraphs"])
 chap_retriever = ChapterRetriever(INDEX["chapters"])
 
 # --- LLM client ---
