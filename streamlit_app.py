@@ -287,7 +287,7 @@ INDEX = load_booklet_index()  # {"paragraphs": [...], "chapters": [...]}
 from app.bootstrap_cases import load_cases
 CASES = load_cases()
 
-from mentor.rag.booklet_retriever import ParagraphRetriever, ChapterRetriever
+from mentor.rag.booklet_retriever import BookletRetriever
 from mentor.engines.chat_engine import ChatEngine
 from mentor.engines.feedback_engine import FeedbackEngine
 from mentor.llm.groq import GroqClient
@@ -403,8 +403,21 @@ render_brand_bar_aligned(
 )
 
 # --- Build retrievers once ---
-para_retriever = ParagraphRetriever(INDEX["paragraphs"])
-chap_retriever = ChapterRetriever(INDEX["chapters"])
+# --- Build retriever once (new JSONL-based retriever) ---
+jsonl_path = os.getenv("BOOKLET_JSONL_PATH", "artifacts/booklet_index.jsonl")
+
+if not os.path.exists(jsonl_path):
+    st.error(
+        f"Booklet index not found at {jsonl_path}. "
+        "Set BOOKLET_JSONL_PATH or ensure artifacts/booklet_index.jsonl exists."
+    )
+    st.stop()
+
+booklet_retriever = BookletRetriever(
+    jsonl_path=jsonl_path,
+    include_types=("paragraph", "case_note", "footnote"),  # sections usually not needed
+    # You can keep default dense/lexical weights; threshold is configured in ChatEngine.answer via env.
+)
 
 # --- LLM client ---
 llm_api_key = st.secrets.get("GROQ_API_KEY")
@@ -416,9 +429,9 @@ llm = GroqClient(api_key=llm_api_key)
 # --- Engines ---
 chat_engine = ChatEngine(
     llm=llm,
-    booklet_index=INDEX,
-    booklet_retriever=para_retriever,  
-    web_retriever=None                 
+    booklet_index=INDEX,          # kept for legacy codepaths / counts elsewhere
+    booklet_retriever=booklet_retriever,
+    web_retriever=None
 )
 feedback_engine = FeedbackEngine(llm=llm)
 
