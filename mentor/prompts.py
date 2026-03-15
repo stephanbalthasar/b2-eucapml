@@ -142,6 +142,7 @@ def build_tutor_messages(
         "Use the provided booklet excerpts and (optionally) web snippets. "
         "If unsure, say what is known and avoid fabricating structural references or case law. "
         "If no context is provided, say what is unknown and ask for clarification."
+        "Detect light conversational intents (e.g., greeting, thanks, goodbye) and reply briefly (about two short sentences), and propose useful next step."
     )
 
     booklet_block = "\n\n".join(f"- {c}" for c in (booklet_chunks or [])[:15]) or "None"
