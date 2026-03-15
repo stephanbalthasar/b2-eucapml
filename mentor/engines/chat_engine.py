@@ -1,4 +1,4 @@
-# mentor/engines/chat_engine.py
+from mentor.prompts import build_tutor_messages
 
 class ChatEngine:
     """
@@ -99,7 +99,7 @@ class ChatEngine:
                 web_snippets = []
     
         # 4) Build messages for LLM (kept)
-        messages = self._build_prompt(
+        messages = build_tutor_messages(
             user_query=user_query,
             booklet_chunks=booklet_chunks,
             web_snippets=web_snippets
@@ -130,23 +130,3 @@ class ChatEngine:
         # TODO: later include legal keyword extraction
         # For now: split by spaces and take simple tokens
         return [w.strip() for w in text.split() if len(w) > 3]
-
-    def _build_prompt(self, user_query, booklet_chunks, web_snippets):
-        system = (
-            "You are a helpful EU/German capital markets law tutor. "
-            "Use the provided booklet excerpts and optional web snippets. "
-            "If unsure, say what is known, and avoid fabricating structural references."
-        )
-        booklet_block = "\n\n".join(f"- {c}" for c in booklet_chunks[:15]) or "None"
-        web_block = "\n\n".join(f"- {s}" for s in web_snippets[:4]) or "None"
-
-        user_content = (
-            f"USER QUERY:\n{user_query}\n\n"
-            f"RELEVANT BOOKLET EXCERPTS:\n{booklet_block}\n\n"
-            f"RELEVANT WEB SNIPPETS:\n{web_block}\n\n"
-            "Please answer clearly and concisely."
-        )
-        return [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user_content}
-        ]
