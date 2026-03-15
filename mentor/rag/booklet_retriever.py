@@ -33,6 +33,7 @@ import json
 import math
 import sys
 from typing import List, Dict, Optional, Tuple
+import numpy as np
 
 # optional deps (graceful fallback)
 try:
@@ -178,15 +179,43 @@ class _BookletRetriever:
         self._bm25 = BM25Okapi(tokenized)
 
     def _build_dense(self):
+        """
+        Load the Sentence-Transformers model on CPU (safe default).
+        If anything fails (torch/device/dtype issues), disable dense retrieval
+        and keep lexical-only so the app never crashes.
+        """
         if not _HAS_ST:
-            sys.stderr.write("[retriever] sentence-transformers not installed → dense disabled\n")
+            sys.stderr.write("[retriever] sentence-transformers not installed → dense disabled (lexical-only)\n")
             self._st_model = None
             self._emb_matrix = None
             return
-        self._st_model = SentenceTransformer(self.model_name)
-        embs = self._st_model.encode(self.texts, batch_size=64, normalize_embeddings=False, show_progress_bar=False)
-        embs = np.asarray(embs, dtype=np.float32)
-        self._emb_matrix = _l2norm_rows(embs)
+    
+        # Allow explicit opt-out via env/secret if you ever need it
+        if os.getenv("BOOKLET_DISABLE_EMBEDDINGS", "").strip() in {"1", "true", "True", "yes"}:
+            sys.stderr.write("[retriever] embeddings disabled by BOOKLET_DISABLE_EMBEDDINGS\n")
+            self._st_model = None
+            self._emb_matrix = None
+            return
+    
+        try:
+            # Force CPU to avoid NotImplementedError on unsupported devices
+            device = os.getenv("BOOKLET_DEVICE", "cpu")
+            self._st_model = SentenceTransformer(self.model_name, device=device)
+    
+            embs = self._st_model.encode(
+                self.texts,
+                batch_size=64,
+                normalize_embeddings=False,
+                show_progress_bar=False
+            )
+            embs = np.asarray(embs, dtype=np.float32)
+            self._emb_matrix = _l2norm_rows(embs)
+    
+        except Exception as e:
+            # Fail safe: keep app running with BM25-only
+            sys.stderr.write(f"[retriever] dense embeddings disabled ({type(e).__name__}: {e}) → lexical-only\n")
+            self._st_model = None
+            self._emb_matrix = None
 
     # ---- search ----
     def search(self, query: str, top_k: int = 6, min_sim: float = 0.38) -> List[Dict]:
