@@ -145,8 +145,8 @@ def build_tutor_messages(
         "Detect light conversational intents (e.g., greeting, thanks, goodbye) and reply briefly (about two short sentences), and propose useful next step."
     )
 
-    booklet_block = "\n\n".join(f"- {c}" for c in (booklet_chunks or [])[:15]) or "None"
-    web_block = "\n\n".join(f"- {s}" for s in (web_snippets or [])[:4]) or "None"
+    booklet_block = "\n\n".join(f"- {c}" for c in (booklet_chunks or [])[:15]) or ""
+    web_block = "\n\n".join(f"- {s}" for s in (web_snippets or [])[:4]) or ""
 
     user_content = (
         f"USER QUERY:\n{user_query}\n\n"
