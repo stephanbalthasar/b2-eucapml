@@ -218,7 +218,7 @@ class _BookletRetriever:
             self._emb_matrix = None
 
     # ---- search ----
-    def search(self, query: str, top_k: int = 6, min_sim: float = 0.38) -> List[Dict]:
+    def search(self, query: str, top_k: int = 6, min_sim: float = 0.01) -> List[Dict]:
         if not query or not query.strip():
             return []
 
