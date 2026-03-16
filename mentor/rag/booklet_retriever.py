@@ -344,3 +344,266 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
         if RE_SECTION.fullmatch(tok) or RE_ARTICLE.fullmatch(tok) or RE_DOCKET.fullmatch(tok):
             continue
 
+        snapped_type = None
+        canonical = None
+        confidence = 0.0
+
+        # Try concepts first
+        best, score, margin = _difflib_best(tok, concepts)
+        if best and _should_snap(tok, score, margin):
+            snapped_type = "concept"
+            canonical = best
+            confidence = score
+
+        # Else try case names
+        if not canonical:
+            best, score, margin = _difflib_best(tok, cases)
+            if best and _should_snap(tok, score, margin):
+                snapped_type = "case_name"
+                canonical = best
+                confidence = score
+
+        if canonical:
+            # Expand with alias maps (TXT bi-directional + corpus auto-links)
+            expanded = set([canonical])
+            expanded = _expand_aliases(expanded, gaz.alias_bi)
+            expanded = _expand_aliases(expanded, corpus_auto_alias)
+            signals.append(dict(type=snapped_type, surface=tok, canonical=canonical,
+                                confidence=confidence, expanded=expanded, fuzzy_eligible=False))
+        else:
+            # Keep as "other" and allow fuzzy in stage (2)
+            if _strip_nonword(tok):  # ignore pure punctuation
+                signals.append(dict(type="other", surface=tok, canonical=tok,
+                                    confidence=0.0, expanded=set([tok]), fuzzy_eligible=True))
+    return _dedup_signals(signals)
+
+def _dedup_signals(signals: List[Dict]) -> List[Dict]:
+    seen = set()
+    out: List[Dict] = []
+    for s in signals:
+        key = (s["type"], s["canonical"].lower(), tuple(sorted(x.lower() for x in s["expanded"])))
+        if key not in seen:
+            seen.add(key)
+            out.append(s)
+    return out
+
+
+# ----------------------------- Corpus auto-aliasing --------------------------
+
+def _find_case_numbers(text: str) -> Set[str]:
+    return set(RE_DOCKET.findall(text))
+
+def _find_case_names(text: str, case_names: List[str]) -> Set[str]:
+    # Simple case-insensitive search for known case names (prefer names with >= 4 letters)
+    t = text.lower()
+    out: Set[str] = set()
+    for name in case_names:
+        if len(_strip_nonword(name)) < 4:
+            continue
+        if name.lower() in t:
+            out.add(name)
+    return out
+
+def build_corpus_auto_alias(nodes: List[Dict], gaz: Gazetteers) -> Dict[str, Set[str]]:
+    """
+    Build alias links from co-occurrence in the corpus:
+      case_name <-> case_number  (in the same paragraph)
+    """
+    auto_map: Dict[str, Set[str]] = {}
+    for n in nodes:
+        text = _norm_ws_hyphen(n.get("text", "") or "")
+        if not text:
+            continue
+        names = _find_case_names(text, gaz.cases)
+        dockets = _find_case_numbers(text)
+        if not names or not dockets:
+            continue
+        for name in names:
+            for num in dockets:
+                auto_map.setdefault(name, set()).add(num)
+                auto_map.setdefault(num, set()).add(name)
+    return auto_map
+
+
+# ----------------------------- Matching & scoring ----------------------------
+
+_WORD_REGEX = re.compile(r"\w+", re.UNICODE)
+
+def _words(text: str) -> List[str]:
+    return _WORD_REGEX.findall(text.lower())
+
+def _has_exact(text_lc: str, needle: str) -> bool:
+    """
+    Exact-ish match: for alnum needles, require word boundaries; for punctuated needles, allow substring.
+    """
+    n = needle.lower()
+    if not n:
+        return False
+    # If needle has non-word chars (like C-628/13), allow substring
+    if re.search(r"\W", n):
+        return n in text_lc
+    # Otherwise require word boundary
+    return re.search(rf"\b{re.escape(n)}\b", text_lc) is not None
+
+def _best_fuzzy_against_words(needle: str, words: List[str]) -> float:
+    n = needle.lower()
+    best = 0.0
+    # Heuristic: only compare against words with similar length to keep it fast
+    m = len(_strip_nonword(needle))
+    if m == 0:
+        return 0.0
+    for w in words:
+        if abs(len(w) - m) > max(2, m // 2):
+            continue
+        r = difflib.SequenceMatcher(None, n, w).ratio()
+        if r > best:
+            best = r
+    return best
+
+def score_node(text: str, signals: List[Dict]) -> float:
+    """
+    Compute a simple additive score for a node.
+    """
+    t_norm = _norm_ws_hyphen(text)
+    t_lc = t_norm.lower()
+    tokens = _words(t_norm)
+
+    score = 0.0
+    # For co-occurrence bonus, track if we saw a case name and a number
+    saw_case_name = False
+    saw_case_no = False
+
+    for s in signals:
+        # Structured signals: sections, articles, docket numbers
+        if s["type"] in {"section", "article", "case_no"}:
+            if _has_exact(t_lc, s["canonical"]):
+                score += W_STRUCTURED
+                if s["type"] == "case_no":
+                    saw_case_no = True
+            continue
+
+        # Gazetteer signals (concepts / case names) with expansion
+        # Try exact against any member of the expanded set
+        hit_exact = False
+        for cand in s["expanded"]:
+            if _has_exact(t_lc, cand):
+                score += W_GAZ_EXACT
+                hit_exact = True
+                if s["type"] == "case_name":
+                    saw_case_name = True
+                # if cand itself is a docket number, mark as such
+                if RE_DOCKET.fullmatch(cand):
+                    saw_case_no = True
+        if hit_exact:
+            continue
+
+        # Fuzzy fallback for eligible signals (only the original canonical)
+        if s.get("fuzzy_eligible", False):
+            # Try fuzzy against words
+            sim = _best_fuzzy_against_words(s["canonical"], tokens)
+            if sim >= _FUZZY_ACCEPT:
+                score += (W_FUZZY * sim)
+
+    # Co-occurrence bonus (case name + number both present)
+    if saw_case_name and saw_case_no:
+        score += W_COOCCUR
+
+    return score
+
+
+# ----------------------------- Retriever class -------------------------------
+
+class ParagraphRetriever:
+    """
+    Minimal, deterministic retriever backed by TXT gazetteers and a JSONL booklet.
+
+    Usage:
+        r = ParagraphRetriever()
+        hits = r.search("Lafonat Ad-hoc-Publizität § 33 WpHG", top_k=6)
+    """
+
+    def __init__(self, _ignored=None):
+        repo = _DEFAULT_REPO
+        ref = _DEFAULT_REF
+        token = _get_token()
+
+        # Load gazetteers
+        self.gaz = _load_gazetteers(repo, ref, token)
+
+        # Load corpus
+        self.nodes: List[Dict] = _load_corpus(repo, ref, _BOOKLET_PATH, token)
+
+        # Build auto alias map from corpus co-occurrences and union with TXT aliases
+        auto_alias = build_corpus_auto_alias(self.nodes, self.gaz)
+        # Merge: union bi-directional TXT aliases with auto aliases
+        self.alias_bi = dict(self.gaz.alias_bi)  # shallow copy
+        for k, v in auto_alias.items():
+            self.alias_bi.setdefault(k, set()).update(v)
+
+        # Precompute lowercased texts for faster matching
+        self._texts_lc: List[str] = [_norm_ws_hyphen(n.get("text", "") or "").lower() for n in self.nodes]
+        self._tokens_list: List[List[str]] = [_words(_norm_ws_hyphen(n.get("text", "") or "")) for n in self.nodes]
+
+    # Public API (legacy-compatible)
+    def search(self, query: str, top_k: int = 6, **_kwargs) -> List[Dict]:
+        if not (query or "").strip():
+            return []
+        # Extract signals (with snapping + alias expansion)
+        signals = extract_signals(query, self.gaz, self.alias_bi)
+        if not signals:
+            return []
+
+        # Score nodes
+        scored: List[Tuple[int, float]] = []
+        for i, n in enumerate(self.nodes):
+            s = score_node(n.get("text", "") or "", signals)
+            if s >= 1.0:  # "sufficiently relevant" threshold
+                scored.append((i, s))
+
+        if not scored:
+            return []
+
+        # Sort by score desc, then shorter text, then original index
+        scored.sort(key=lambda x: (-x[1], len(self.nodes[x[0]].get("text", "") or ""), x[0]))
+
+        # Package top_k
+        indices = [i for (i, _s) in scored[:max(1, top_k)]]
+        scores = [float(_s) for (_i, _s) in scored[:max(1, top_k)]]
+        return self._package_hits(indices, scores)
+
+    def _package_hits(self, indices: List[int], scores: List[float]) -> List[Dict]:
+        out: List[Dict] = []
+        for rank, (i, score) in enumerate(zip(indices, scores), start=1):
+            n = self.nodes[i]
+            # "breadcrumb" in legacy code; booklet may hold "breadcrumbs"
+            breadcrumb = n.get("breadcrumb", None)
+            if breadcrumb is None:
+                # pass through "breadcrumbs" if that is the field present
+                breadcrumb = n.get("breadcrumbs", None)
+            item = {
+                "text": n.get("text", ""),
+                "score": score,
+                "rank": rank,
+                "node_id": n.get("node_id"),
+                "doc_id": n.get("doc_id"),
+                "type": n.get("type"),
+                "anchor": n.get("anchor"),
+                "breadcrumb": breadcrumb,
+                "lang": n.get("lang"),
+                "links": n.get("links", {}),
+            }
+            out.append(item)
+        return out
+
+
+# ----------------------------- Optional: quick self-test ----------------------
+
+if __name__ == "__main__":
+    # Minimal smoke test (requires REPO_XPAT and live repo paths)
+    q = "Lafonat § 33 WpHG Ad-hoc-Publizität"
+    r = ParagraphRetriever()
+    hits = r.search(q, top_k=6)
+    print(f"Query: {q}")
+    for h in hits:
+        print(f"- rank={h['rank']} score={h['score']:.2f}  {h.get('breadcrumb','')}")
+        print("  ", (h["text"][:160] + "…") if len(h["text"]) > 160 else h["text"])
