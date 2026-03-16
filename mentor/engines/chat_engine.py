@@ -15,6 +15,17 @@ class ChatEngine:
         self.booklet_retriever = booklet_retriever  # Prefer ParagraphRetriever
         self.web_retriever = web_retriever  # may be None for now
 
+    def answer_open(self, user_q: str, *, model: str, temperature: float, max_tokens: int = 700) -> str:
+        """
+        Pure conversational mode: no retrieval, no grounding.
+        """
+        return self.llm.chat(
+            prompt=user_q,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+    
     def answer(self, user_query, *, model, temperature, max_tokens=800):
         """
         One-purpose engine:
