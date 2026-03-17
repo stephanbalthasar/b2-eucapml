@@ -513,6 +513,27 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
         snapped_type = None
         confidence = 0.0
 
+        # --- CASE headword → full phrase snapping (Step 5) ---
+        # If 'tok' is the first word of a multi-word case name (e.g., "Spector" → "Spector Photo"),
+        # promote it to a case_name signal for all matching cases. This scales to bigrams/trigrams.
+        head_candidates = [c for c in gaz.cases if c.lower().startswith(tok_norm + " ")]
+        if head_candidates:
+            for canon in head_candidates[:5]:  # cap to avoid flooding on highly ambiguous heads
+                canon_norm = canon.lower()
+                expanded = set([canon_norm])
+                # include both manual aliases and auto aliases mined from the corpus
+                expanded = _expand_aliases(expanded, gaz.alias_bi)
+                expanded = _expand_aliases(expanded, corpus_auto_alias)
+                signals.append(dict(
+                    type="case_name",
+                    surface=tok,             # the user typed "Spector"; canonical carries "spector photo"
+                    canonical=canon_norm,
+                    confidence=0.99,         # strong, deterministic signal
+                    expanded=expanded,
+                    fuzzy_eligible=False
+                ))
+            continue  # done with this token; move to the next
+        
         # --- NEW: multi-word canonical matching (fixes "inside information") ---
         for canon in gaz.concepts:
             canon_norm = canon.lower()
