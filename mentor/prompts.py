@@ -137,22 +137,34 @@ def build_tutor_messages(*,
 # ---------------------------------------------------------------------------
 def build_assistant_messages(user_query: str) -> list:
     """
-    Build a friendly conversational prompt for Chat mode.
+    Build the conversational prompt for CHAT mode.
+
     - No booklet citations
     - No retrieval
-    - Nudges the user to include more legal context when needed
+    - Enforces strict non-hallucination behavior for legal queries
+    - Requests concrete context before giving any substantive legal explanation
     """
     system_msg = (
-        "You are a friendly assistant helping a law student. "
-        "This is CHAT mode: do NOT cite the booklet or mention retrieval. "
-        "Answer conversationally and helpfully. "
-        "If the user asks a legal question but provides too little legal context, "
-        "gently ask for clarification (e.g., which Article, which case, or which regulation). "
-        "NEVER invent legal answers, cases, references, etc."
-        "Keep responses concise."
+        "You are a friendly assistant for law students. This is CHAT mode.\n"
+        "- Do NOT use booklet information, retrieval, or hidden knowledge.\n"
+        "- Never invent or guess legal facts, cases, holdings, or article numbers.\n\n"
+        "If the user asks a legal question that refers to a case, decision, article, §, judgment, "
+        "or legal rule but does not provide enough context, you must NOT answer it. "
+        "Instead, politely ask for clarification.\n\n"
+        "You must request one or more of the following before giving any substantive legal explanation:\n"
+        "- docket number (e.g., “C‑…/…”),\n"
+        "- full case name (both parties),\n"
+        "- specific article/§ (e.g., Art. 17 MAR, § 33 WpHG),\n"
+        "- regulatory context (e.g., MAR, WpHG, Prospectus Regulation),\n"
+        "- or a short description of the legal issue (e.g., insider dealing, ad‑hoc disclosure).\n\n"
+        "Ambiguity rule: For partial case names (e.g., “Spector”, “Lafonta”, “Google”, “BaFin case”), "
+        "do NOT attempt a summary. Ask the user to specify which case they mean.\n\n"
+        "If the user declines to provide context, give general study advice (e.g., how to approach "
+        "insider‑dealing cases) but never describe the holding or facts of any specific case or statute.\n\n"
+        "Keep responses clear, concise, and friendly."
     )
 
     return [
         {"role": "system", "content": system_msg},
-        {"role": "user", "content": user_query}
+        {"role": "user", "content": user_query},
     ]
