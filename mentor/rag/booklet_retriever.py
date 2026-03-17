@@ -516,15 +516,15 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
             if len(canon_words) > 1:
                 # all canonical words must be present as tokens
                 if all(w in token_set_lc for w in canon_words):
-                if all(w in surface_tokens for w in canon_words):
-                    signals.append(dict(
-                        type="concept",
-                        surface=tok,
-                        canonical=canon_norm,
-                        confidence=1.0,
-                        expanded={canon_norm},
-                        fuzzy_eligible=False
-                    ))
+                    if all(w in surface_tokens for w in canon_words):
+                        signals.append(dict(
+                            type="concept",
+                            surface=tok,
+                            canonical=canon_norm,
+                            confidence=1.0,
+                            expanded={canon_norm},
+                            fuzzy_eligible=False
+                        ))
                     break  # go to next tok
         # --- multi-word canonical matching for CASE NAMES (Step 2) ---
         for canon in gaz.cases:
