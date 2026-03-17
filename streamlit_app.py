@@ -475,8 +475,11 @@ with st.sidebar:
                 hide_index=True,
                 use_container_width=True,
             )
-
-
+            last_dec = st.session_state.get("_last_router_decision")
+            if last_dec:
+                st.caption(
+                    f"Router → {last_dec.get('label')} · v={last_dec.get('v')}"
+                )
 
 # --- Tabs: Feedback + Tutor chat ---
 tab_feedback, tab_chat = st.tabs(["📝 Sample Exam Cases", "💬 General Chat"])
@@ -703,27 +706,28 @@ with tab_chat:
             st.session_state["_last_signals"] = [{"type": "ERROR", "surface": "", "canonical": str(e), "confidence": 0.0, "expanded_preview": ""}]
 
         # Heuristic router (no LLM): counts gazetteer hits (exact or fuzzy)
-        decision = route(user_q)  # returns {"mode": "rag"|"chat", "count": int}
-
+        decision = route(user_q)  # now returns ui_label + total_conf + router_version
+        
         if decision["mode"] == "rag":
-            # RAG: existing booklet-grounded pipeline
+            # RAG pipeline
             answer = chat_engine.answer(
                 user_query=user_q,
-                model=model,           # keep your sidebar model selection
+                model=model,
                 temperature=temp,
                 max_tokens=700
             )
-            return f"_Mode: Booklet-grounded (concepts={decision['count']})_\n\n{answer}"
+            # Use the label built by the router (includes the confidence sum)
+            return f"_{decision.get('ui_label', 'Mode: RAG')}_\n\n{answer}"
         else:
-            # Chat Mode: assistant (no retrieval)
+            # Assistant pipeline
             answer = chat_engine.assist(
                 user_query=user_q,
                 model="llama-3.1-8b-instant",
                 temperature=0.6,
                 max_tokens=350
             )
-            return f"_Mode: Chat (concepts={decision['count']})_\n\n{answer}"
-
+            return f"_{decision.get('ui_label', 'Mode: Chat')}_\n\n{answer}"
+        
     render_conversation(
         state_key="tutor_chat",
         title="General Chat (auto‑routed: Chat ↔ Booklet‑grounded)",
