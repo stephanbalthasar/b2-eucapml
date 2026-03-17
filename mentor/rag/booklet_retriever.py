@@ -287,6 +287,10 @@ class Gazetteers:
                 cset.add(a)
                 bi.setdefault(a, set()).add(canon)
         self.alias_bi = bi
+        self.alias_bi_lc: Dict[str, Set[str]] = {}
+        for k, vs in self.alias_bi.items():
+            k_lc = k.lower()
+            s = self.alias_bi_lc.setdefault
 
 def _load_gazetteers_local() -> 'Gazetteers':
     txt_concepts = _read_local(LOCAL_CONCEPTS)
@@ -477,30 +481,30 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
     for tok in surface_tokens:
         # --- NEW: alias-first snapping (fixes "Spector", acronyms, short forms) ---
         tok_norm = tok.lower()
-        if tok_norm in gaz.alias_bi:
-            alias_targets = gaz.alias_bi[tok_norm]
+        if tok_norm in gaz.alias_bi_lc:                 # case-insensitive hit
+            alias_targets = gaz.alias_bi_lc[tok_norm]   # targets are lower-cased canonicals
             for canon in alias_targets:
                 canon_norm = canon.lower()
-                if canon_norm in (c.lower() for c in gaz.cases):
-                    signals.append(dict(
-                        type="case_name",
-                        surface=tok,
-                        canonical=canon_norm,
-                        confidence=1.0,
-                        expanded=set(_expand_aliases({canon_norm}, gaz.alias_bi)),
-                        fuzzy_eligible=False
-                    ))
+                if tok_norm in gaz.alias_bi_lc:
+                    alias_targets = gaz.alias_bi_lc[tok_norm]
+                    for canon in alias_targets:
+                        canon_norm = canon.lower()
+                        if canon_norm in (c.lower() for c in gaz.concepts):
+                            signals.append(dict(
+                                type="concept",
+                                surface=tok,
+                                canonical=canon_norm,
+                                confidence=1.0,
+                                expanded=set(_expand_aliases({canon_norm}, gaz.alias_bi)),
+                                fuzzy_eligible=False
+                            ))
+                            # no 'break' here; multiple concept targets are unlikely but safe
                     continue  # next token
-                if canon_norm in (c.lower() for c in gaz.concepts):
-                    signals.append(dict(
-                        type="concept",
-                        surface=tok,
-                        canonical=canon_norm,
-                        confidence=1.0,
-                        expanded=set(_expand_aliases({canon_norm}, gaz.alias_bi)),
-                        fuzzy_eligible=False
-                    ))
-                    continue  # next token
+                                
+            # NOTE: we intentionally don't 'return' here; we still want to allow the
+            #       same token to match a concept alias below if applicable.
+            #       But we DO want to skip the rest of logic for this token
+            continue  # next token
         
         if RE_SECTION.fullmatch(tok) or RE_ARTICLE.fullmatch(tok) or RE_DOCKET.fullmatch(tok):
             continue
