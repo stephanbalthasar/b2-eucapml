@@ -303,7 +303,10 @@ def _load_gazetteers_local() -> 'Gazetteers':
 # =============================================================================
 
 RE_SECTION = re.compile(r"§\s*\d+[a-z]?(?:\s*(?:Abs\.?|Satz)\s*\d+)*", re.IGNORECASE)
-RE_ARTICLE = re.compile(r"(?:Art\.?|Artikel)\s*\d+[a-z]?(?:\(\d+\))*", re.IGNORECASE)
+RE_ARTICLE = re.compile(
+    r"(?:Art\.?|Article|Artikel)\s*\d+[a-z]?(?:\(\d+\))*",
+    re.IGNORECASE
+)
 RE_DOCKET  = re.compile(r"\b(?:[CE]-\d+/\d{2}|[IVX]+\s+Z[RB]\s+\d+/\d{2})\b", re.IGNORECASE)
 
 def _strip_nonword(s: str) -> str:
@@ -469,6 +472,33 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
     surface_tokens.sort(key=lambda x: (-len(_strip_nonword(x)), x.lower()))
 
     for tok in surface_tokens:
+        # --- NEW: alias-first snapping (fixes "Spector", acronyms, short forms) ---
+        tok_norm = tok.lower()
+        if tok_norm in gaz.alias_bi:
+            alias_targets = gaz.alias_bi[tok_norm]
+            for canon in alias_targets:
+                canon_norm = canon.lower()
+                if canon_norm in (c.lower() for c in gaz.cases):
+                    signals.append(dict(
+                        type="case_name",
+                        surface=tok,
+                        canonical=canon_norm,
+                        confidence=1.0,
+                        expanded=set(_expand_aliases({canon_norm}, alias_bi)),
+                        fuzzy_eligible=False
+                    ))
+                    continue  # next token
+                if canon_norm in (c.lower() for c in gaz.concepts):
+                    signals.append(dict(
+                        type="concept",
+                        surface=tok,
+                        canonical=canon_norm,
+                        confidence=1.0,
+                        expanded=set(_expand_aliases({canon_norm}, alias_bi)),
+                        fuzzy_eligible=False
+                    ))
+                    continue  # next token
+        
         if RE_SECTION.fullmatch(tok) or RE_ARTICLE.fullmatch(tok) or RE_DOCKET.fullmatch(tok):
             continue
 
@@ -476,6 +506,23 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
         snapped_type = None
         confidence = 0.0
 
+        # --- NEW: multi-word canonical matching (fixes "inside information") ---
+        for canon in gaz.concepts:
+            canon_norm = canon.lower()
+            canon_words = canon_norm.split()
+            if len(canon_words) > 1:
+                # all canonical words must be present as tokens
+                if all(w in surface_tokens for w in canon_words):
+                    signals.append(dict(
+                        type="concept",
+                        surface=tok,
+                        canonical=canon_norm,
+                        confidence=1.0,
+                        expanded={canon_norm},
+                        fuzzy_eligible=False
+                    ))
+                    break  # go to next tok
+        
         best, score, margin = _difflib_best(tok, gaz.concepts)
         if best and _should_snap(tok, score, margin):
             canonical = best
