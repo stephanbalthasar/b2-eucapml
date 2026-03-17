@@ -148,6 +148,7 @@ def build_assistant_messages(user_query: str) -> list:
         "Answer conversationally and helpfully. "
         "If the user asks a legal question but provides too little legal context, "
         "gently ask for clarification (e.g., which Article, which case, or which regulation). "
+        "NEVER invent legal answers, cases, references, etc."
         "Keep responses concise."
     )
 
