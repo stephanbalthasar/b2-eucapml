@@ -11,6 +11,7 @@ import streamlit as st
 import time
 from typing import Callable, List, Dict, Any
 from app.router import route
+from mentor.rag.booklet_retriever import extract_signals
 # ───────────────────────────────────────────────────────────────────────────────
 
 # === HELPERS ===
@@ -451,6 +452,31 @@ with st.sidebar:
     if st.button("Reload booklet index (server cache)"):
         st.cache_data.clear()
         st.success("Re-loaded. Re-run the action to use the latest JSON.")
+
+    st.divider()
+    debug_signals = st.toggle("🔧 Show signal debugger", value=False, help=(
+        "Show the raw signals detected by extract_signals() for the last query "
+        "(type, surface, canonical, confidence, expanded)."
+    ))
+    st.session_state["_show_signal_debugger"] = debug_signals
+
+    if debug_signals:
+        st.markdown("#### Signal Debugger")
+        last = st.session_state.get("_last_signals")
+        if not last:
+            st.caption("No signals yet — ask a question to see them here.")
+        else:
+            # Render a compact table
+            import pandas as pd
+            df = pd.DataFrame(last)
+            # Nice, narrow columns for readability
+            st.dataframe(
+                df[["type", "surface", "canonical", "confidence", "expanded_preview"]],
+                hide_index=True,
+                use_container_width=True,
+            )
+
+
 
 # --- Tabs: Feedback + Tutor chat ---
 tab_feedback, tab_chat = st.tabs(["📝 Sample Exam Cases", "💬 General Chat"])
