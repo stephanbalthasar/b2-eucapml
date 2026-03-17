@@ -29,7 +29,7 @@ def _norm(text: str) -> str:
     if not text:
         return ""
     t = unicodedata.normalize("NFKC", text)
-    t = t.translate(_HYHEN_MAP) if False else t.translate(_HYPHEN_MAP)  # keep compatibility if needed
+    t = t.translate(_HYPHEN_MAP) if False else t.translate(_HYPHEN_MAP)  # keep compatibility if needed
     t = t.lower().strip()
     return " ".join(t.split())
 
