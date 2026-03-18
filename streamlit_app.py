@@ -264,18 +264,18 @@ def update_gist(new_entry):
     url = f"https://api.github.com/gists/{gist_id}"
     headers = {"Authorization": f"token {token}"}
 
-    # 1) Read current EUCapML_Mentor_Log.csv (or start with the header)
+    # 1) Read current b2_log.csv (or start with the header)
     try:
         r = requests.get(url, headers=headers, timeout=8)
         files = r.json().get("files", {}) if r.status_code == 200 else {}
-        content = files.get("EUCapML_Mentor_Log.csv", {}).get("content", "")
+        content = files.get("b2_log.csv", {}).get("content", "")
         lines = [ln for ln in content.splitlines() if ln.strip()] or ["timestamp,event,role"]
     except Exception:
         lines = ["timestamp,event,role"]
 
     # 2) Append the new entry and push
     lines.append(",".join(new_entry))
-    payload = {"files": {"EUCapML_Mentor_Log.csv": {"content": "\n".join(lines)}}}
+    payload = {"files": {"b2_log.csv": {"content": "\n".join(lines)}}}
     try:
         requests.patch(url, headers=headers, data=json.dumps(payload), timeout=8)
     except Exception:
