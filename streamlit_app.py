@@ -252,7 +252,7 @@ def render_privacy_overlay_if_requested():
 # --- minimalist logger: uses only LOG_GIST_TOKEN + GIST_ID ---
 def update_gist(new_entry):
     """
-    Append [timestamp, event, role] to EUCapML_Mentor_Log.csv in a GitHub Gist.
+    Append [timestamp, event, role] to b2_log.csv in a GitHub Gist.
     Uses a dedicated token only: st.secrets['LOG_GIST_TOKEN'].
     If not configured, this function silently no-ops.
     """
