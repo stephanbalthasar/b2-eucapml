@@ -730,7 +730,7 @@ with tab_chat:
         
     render_conversation(
         state_key="tutor_chat",
-        title="General Chat (auto‑routed: Chat ↔ Booklet‑grounded)",
+        title="General Chat (Course Material)",
         placeholder="Ask the tutor…",
         on_ask=on_ask_tutor,
         clear_label="🗑️ Clear chat",
