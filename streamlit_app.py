@@ -512,7 +512,7 @@ with tab_feedback:
     # 1. CASE SELECTION (kept unchanged)
     # -----------------------------
     case_titles = [c.get("title", c.get("id", "Untitled case")) for c in CASES]
-    sel_case_title = st.selectbox("Select exam case", case_titles, index=0)
+    sel_case_title = st.selectbox("Select case", case_titles, index=0)
     sel_case = next(c for c in CASES if c.get("title", c.get("id")) == sel_case_title)
     sel_case_id = sel_case.get("id", "unknown")
 
