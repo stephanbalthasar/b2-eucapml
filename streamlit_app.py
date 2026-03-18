@@ -682,13 +682,8 @@ with tab_feedback:
 with tab_chat:
     def build_combined_query(recent_msgs, current_msg, window=3):
         msgs = recent_msgs[-(window - 1):] + [current_msg]
-        parts = ["Combined user intent (last {} turns):".format(len(msgs)), ""]
-        for i, m in enumerate(msgs, 1):
-            parts.append(f"{i}. {m}")
-        parts.append("")
-        parts.append("Most recent user message:")
-        parts.append(current_msg)
-        return "\n".join(parts)
+        # Clean combination: just stitch the raw user messages
+        return " ".join(msgs)
     
     def on_ask_tutor(user_q: str, history: List[Dict[str, Any]]) -> str:
         # Optional: keep your student usage ping
