@@ -67,6 +67,7 @@ W_STRUCTURED = 3.0
 W_GAZ_EXACT  = 2.5
 W_FUZZY      = 0.6
 W_COOCCUR    = 0.4
+W_CASE_EXACT = 3.0
 
 def _dbg(msg: str):
     if os.getenv("RAG_DEBUG", "0") == "1":
