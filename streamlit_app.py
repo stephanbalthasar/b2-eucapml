@@ -480,8 +480,7 @@ with st.sidebar:
                 st.caption(
                     f"Router → {last_dec.get('label')} · v={last_dec.get('v')}"
                 )
-            st.caption(f"Router → {decision.get('ui_label')} · v={decision.get('router_version')}")
-
+            
 # --- Tabs: Feedback + Tutor chat ---
 tab_feedback, tab_chat = st.tabs(["📝 Sample Exams", "💬 General Chat"])
 
