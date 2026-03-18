@@ -706,27 +706,34 @@ with tab_chat:
             st.session_state["_last_signals"] = [{"type": "ERROR", "surface": "", "canonical": str(e), "confidence": 0.0, "expanded_preview": ""}]
 
         # Heuristic router (no LLM): counts gazetteer hits (exact or fuzzy)
-        decision = route(user_q)  # now returns ui_label + total_conf + router_version
+        # --- Router decision ---
+        decision = route(user_q)
         
+        # Store router information for the sidebar debugger
+        st.session_state["_last_router_decision"] = {
+            "mode": decision.get("mode"),
+            "conf": decision.get("total_conf"),
+            "label": decision.get("ui_label"),
+            "v": decision.get("router_version"),
+        }
+        
+        # --- RAG vs Chat output WITHOUT inserting router metadata into the chat ---
         if decision["mode"] == "rag":
-            # RAG pipeline
             answer = chat_engine.answer(
                 user_query=user_q,
                 model=model,
                 temperature=temp,
-                max_tokens=700
+                max_tokens=700,
             )
-            # Use the label built by the router (includes the confidence sum)
-            return f"_{decision.get('ui_label', 'Mode: RAG')}_\n\n{answer}"
+            return answer
         else:
-            # Assistant pipeline
             answer = chat_engine.assist(
                 user_query=user_q,
                 model="llama-3.1-8b-instant",
                 temperature=0.6,
-                max_tokens=350
+                max_tokens=350,
             )
-            return f"_{decision.get('ui_label', 'Mode: Chat')}_\n\n{answer}"
+            return answer
         
     render_conversation(
         state_key="tutor_chat",
