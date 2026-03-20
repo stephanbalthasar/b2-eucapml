@@ -8,18 +8,19 @@ import mimetypes
 import os
 import requests
 import streamlit as st
-import time
-from typing import Callable, List, Dict, Any
-from app.router import route
-from mentor.rag.booklet_retriever import extract_signals
-# ───────────────────────────────────────────────────────────────────────────────
-
 st.set_page_config(
     page_title="B's Bot",
     page_icon="assets/b2_logo_1024.png",
     layout="wide",
     initial_sidebar_state="collapsed"  # NEW: collapse sidebar by default
 )
+import time
+from typing import Callable, List, Dict, Any
+from app.router import route
+from mentor.rag.booklet_retriever import extract_signals
+# ───────────────────────────────────────────────────────────────────────────────
+
+
 
 # === HELPERS ===
 # === APP BAR ===
