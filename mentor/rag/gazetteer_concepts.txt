@@ -24,6 +24,7 @@ BGH
 BörsG
 BörsO
 BörsZulV
+booklet
 Bundesanstalt für Finanzdienstleistungsaufsicht
 Capital Markets Union
 Case
@@ -37,6 +38,7 @@ Common stock
 Company Law Directive
 Corporate Sustainability Reporting Directive
 Correlation table
+course
 Court
 Credit Rating
 Credit Rating Agencies Regulation
@@ -113,6 +115,7 @@ Listing Act
 Listing Directive
 MAD Directive
 Managers’ transactions
+manual
 Manufacturer
 MAR 
 Market Abuse Directive
@@ -165,6 +168,7 @@ Regulatory technical standard
 Related Party Transaction
 Schuldverschreibungsgesetz
 SchVG
+script
 Secondary market
 Securities
 Security token
