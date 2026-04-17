@@ -20,11 +20,14 @@ Acting in concert
 Ad hoc announcement
 AIFM
 Alternative Investment Fund
+BGH
 BörsG
 BörsO
 BörsZulV
 Bundesanstalt für Finanzdienstleistungsaufsicht
 Capital Markets Union
+Case
+Case study
 Central counterparty
 Central Securities Depository
 Clearing 
@@ -34,8 +37,11 @@ Common stock
 Company Law Directive
 Corporate Sustainability Reporting Directive
 Correlation table
+Court
 Credit Rating
 Credit Rating Agencies Regulation
+Decision
+Definition
 Delisting
 Denomination
 Derivative
@@ -98,6 +104,7 @@ IPO
 ISDA Master Agreement
 ISRB
 ITS
+Judgment
 KAGB
 Kapitalanlagegesetzbuch
 Lamfalussy process
@@ -138,6 +145,7 @@ Preference share
 Preferred stock
 Primary market
 Private placement
+Problem
 Product intervention
 Professional Client
 Prospectus
