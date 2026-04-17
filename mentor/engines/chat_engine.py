@@ -70,6 +70,24 @@ class ChatEngine:
             hits = []
     
         # Normalize to list[str] for prompt (kept)
+        TYPE_PRIORITY = {
+            "case_note":  2.0,   # pedagogical case summaries
+            "paragraph":  1.0,   # doctrinal exposition (default answer material)
+            "footnote":  -2.0,   # authority only, not an answer
+            "section":   -3.0,   # headings, never substance
+        }
+
+        def _type_priority(hit):
+            if not isinstance(hit, dict):
+                return 0.0
+            return TYPE_PRIORITY.get(hit.get("type"), 0.0)
+        
+        hits = sorted(
+            hits,
+            key=_type_priority,
+            reverse=True
+        )
+        
         booklet_chunks = [
             (h.get("text") if isinstance(h, dict) else str(h))
             for h in hits if h
