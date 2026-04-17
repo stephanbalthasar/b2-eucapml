@@ -69,6 +69,17 @@ W_FUZZY      = 0.6
 W_COOCCUR    = 0.4
 W_CASE_EXACT = 3.0
 
+# ---------------------------------------------------------------------------
+# Baseline weights by node type (legal epistemic hierarchy)
+# ---------------------------------------------------------------------------
+
+BASE_WEIGHT_BY_TYPE = {
+    "paragraph":  1.0,    # core doctrinal content
+    "case_note":  1.1,    # self-contained pedagogical objects
+    "footnote":  -2.0,    # authority only – never a primary answer
+    "section":   -1.5,    # headings – context, not substance
+}
+
 def _dbg(msg: str):
     if os.getenv("RAG_DEBUG", "0") == "1":
         print(f"[booklet_retriever] {msg}")
