@@ -71,10 +71,10 @@ class ChatEngine:
     
         # Normalize to list[str] for prompt (kept)
         TYPE_PRIORITY = {
-            "case_note":  2.0,   # pedagogical case summaries
-            "paragraph":  1.0,   # doctrinal exposition (default answer material)
-            "footnote":  -2.0,   # authority only, not an answer
-            "section":   -3.0,   # headings, never substance
+            "case_note":  0.5,   # pedagogical case summaries
+            "paragraph":  2.0,   # doctrinal exposition (default answer material)
+            "footnote":  -1.0,   # authority only, not an answer
+            "section":   -1.0,   # headings, never substance
         }
 
         def _type_priority(hit):
