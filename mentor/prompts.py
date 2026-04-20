@@ -240,3 +240,42 @@ def build_conversational_tutor_messages(
     materials_blocks: List[str] = []
 
     if retrieved_booklet_chunks:
+        cleaned = [c.strip() for c in retrieved_booklet_chunks if c.strip()]
+        if cleaned:
+            materials_blocks.append(
+                "RELEVANT COURSE MATERIAL (Booklet excerpts):\n"
+                + "\n\n".join(f"- {c}" for c in cleaned)
+            )
+
+    if retrieved_web_snippets:
+        cleaned = [w.strip() for w in retrieved_web_snippets if w.strip()]
+        if cleaned:
+            materials_blocks.append(
+                "RELEVANT EXTERNAL MATERIAL (for context only):\n"
+                + "\n\n".join(f"- {w}" for w in cleaned)
+            )
+
+    if materials_blocks:
+        messages.append(
+            {
+                "role": "system",
+                "content": "\n\n".join(materials_blocks),
+            }
+        )
+
+    # -----------------------------
+    # Final instruction
+    # -----------------------------
+    messages.append(
+        {
+            "role": "system",
+            "content": (
+                "Task:\n"
+                "Using the conversation above and, where provided, the relevant "
+                "materials, answer the user's latest input.\n"
+                "Do not restate the conversation. Be concise but legally precise."
+            ),
+        }
+    )
+
+    return messages
