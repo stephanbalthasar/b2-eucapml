@@ -132,6 +132,9 @@ def build_conversational_tutor_messages(
         "- If the user input is conversational (e.g. a greeting), respond "
         "naturally and briefly without introducing legal analysis.\n"
         "- Do not invent legal sources, article numbers, or case law.\n"
+        "- Never invent or guess legal facts, cases, holdings, or article numbers.\n\n"
+        "If the user asks a legal question, but does not provide enough context, you must NOT answer it. "
+        "Instead, politely ask for clarification.\n\n"
     )
 
     messages: List[Dict[str, str]] = [
