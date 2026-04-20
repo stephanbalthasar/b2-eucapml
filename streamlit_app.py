@@ -686,16 +686,26 @@ with tab_feedback:
                     # --------------------------------------------------
                     # Optional retrieval
                     # --------------------------------------------------
+                    def conversation_to_retrieval_query(conversation):
+                        """
+                        Convert the full conversation into a retrieval-safe query string.
+                        Keeps semantic context (including assistant clarifications).
+                        """
+                        return " ".join(
+                            f"{m['role']}: {m['content']}"
+                            for m in conversation
+                            if m["role"] in ("user", "assistant")
+                        )
                     retrieved_booklet_chunks = None
                     retrieved_web_snippets = None
                 
                     if decision["mode"] == "rag":
-                        # Booklet retrieval can (and should) use the conversation semantics
-                        retrieved_booklet_chunks = para_retriever.retrieve(
-                            conversation=conversation,
+                        retrieval_query = conversation_to_retrieval_query(conversation)
+                        retrieved_booklet_chunks = para_retriever.search(
+                            retrieval_query,
                             top_k=5,
                         )
-                
+                                    
                         # If you later turn web retrieval back on, it plugs in here
                         retrieved_web_snippets = None
                 
