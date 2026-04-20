@@ -662,10 +662,26 @@ with tab_feedback:
                     # Keep your audit behavior: log only for students
                     if st.session_state.get("role") == "student":
                         update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "FOLLOW_UP", "student"])
-            
+
+                    # Build retrieval query from follow-up + feedback
+                    retrieval_query = (
+                        f"FOLLOW-UP QUESTION:\n{user_q}\n\n"
+                        f"EXAMINER FEEDBACK:\n{st.session_state.get('exam_feedback', '')}"
+                    )
+                    
+                    # Retrieve booklet chunks
+                    hits = para_retriever.search(retrieval_query, top_k=8)
+                    
+                    # Normalize to List[str]
+                    booklet_chunks = [
+                        (h.get("text") if isinstance(h, dict) else str(h))
+                        for h in hits if h
+                    ]
+                    
                     return feedback_engine.follow_up_with_history(
                         question=user_q,
                         context=context,
+                        booklet_chunks=booklet_chunks,
                         model=model,
                         temperature=temp,
                     )
