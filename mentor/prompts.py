@@ -101,81 +101,11 @@ def build_followup_messages(previous_feedback: str, followup_question: str,
     return [{"role": "system", "content": system},
             {"role": "user",   "content": user}]
 
-
-## deprecated##
-def build_tutor_messages(*,
-                         user_query: str,
-                         booklet_chunks: List[str],
-                         web_snippets: List[str]) -> List[Dict[str, str]]:
-    """
-    Returns a standard system+user message list for the tutor.
-    The engine is responsible for retrieval and passes content here.
-    """
-    system = (
-        "You are a helpful EU/German capital markets law tutor. "
-        "Use the provided booklet excerpts and (optionally) web snippets. "
-        "If unsure, say what is known and avoid fabricating structural references or case law."
-        "If no context is provided, refuse to reply and ask for more information."
-    )
-
-    booklet_block = "\n\n".join(f"- {c}" for c in (booklet_chunks or [])[:15]) or "None"
-    web_block = "\n\n".join(f"- {s}" for s in (web_snippets or [])[:4]) or "None"
-
-    user_content = (
-        f"USER QUERY:\n{user_query}\n\n"
-        f"RELEVANT BOOKLET EXCERPTS:\n{booklet_block}\n\n"
-        f"RELEVANT WEB SNIPPETS:\n{web_block}\n\n"
-        "Please answer clearly and concisely."
-    )
-
-    return [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user_content},
-    ]
-# ---------------------------------------------------------------------------
-# Assistant (Chat Mode) Prompt (deprecated)
-# ---------------------------------------------------------------------------
-def build_assistant_messages(user_query: str) -> list:
-    """
-    Build the conversational prompt for CHAT mode.
-
-    - No booklet citations
-    - No retrieval
-    - Enforces strict non-hallucination behavior for legal queries
-    - Requests concrete context before giving any substantive legal explanation
-    """
-    
-  system_msg = (
-        "You are a friendly assistant for law students. This is CHAT mode.\n"
-        "- Do NOT use booklet information, retrieval, or hidden knowledge.\n"
-        "- Never invent or guess legal facts, cases, holdings, or article numbers.\n\n"
-        "If the user asks a legal question that refers to a case, decision, article, §, judgment, "
-        "or legal rule but does not provide enough context, you must NOT answer it. "
-        "Instead, politely ask for clarification.\n\n"
-        "You must request one or more of the following before giving any substantive legal explanation:\n"
-        "- docket number (e.g., “C‑…/…”),\n"
-        "- full case name (both parties),\n"
-        "- specific article/§ (e.g., Art. 17 MAR, § 33 WpHG),\n"
-        "- regulatory context (e.g., MAR, WpHG, Prospectus Regulation),\n"
-        "- or a short description of the legal issue (e.g., insider dealing, ad‑hoc disclosure).\n\n"
-        "Ambiguity rule: For partial case names (e.g., “Spector”, “Lafonta”, “Google”, “BaFin case”), "
-        "do NOT attempt a summary. Ask the user to specify which case they mean.\n\n"
-        "If the user declines to provide context, give general study advice (e.g., how to approach "
-        "insider‑dealing cases) but never describe the holding or facts of any specific case or statute.\n\n"
-        "Keep responses clear, concise, and friendly."
-    )
-
-    return [
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": user_query},
-    ]
-
 # ============================================================
 # Canonical Conversational Tutor Prompt
 # ============================================================
 
 from typing import List, Dict, Optional
-
 
 def build_conversational_tutor_messages(
     *,
