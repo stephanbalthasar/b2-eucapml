@@ -634,6 +634,19 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
         if key not in seen:
             seen.add(key)
             out.append(s)
+    # ---------------------------------------------------------
+    # STEP 4: Suppress sub-phrase signals (longest match wins)
+    # ---------------------------------------------------------
+
+    canonicals = [s["canonical"].lower() for s in out]
+
+    def _is_subphrase(p: str) -> bool:
+        return any(p != other and p in other for other in canonicals)
+
+    out = [
+        s for s in out
+        if not _is_subphrase(s["canonical"].lower())
+    ]
     return out
 
 
