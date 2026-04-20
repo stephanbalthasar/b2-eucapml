@@ -213,7 +213,7 @@ def build_conversational_tutor_messages(
         "naturally and briefly without introducing legal analysis.\n"
         "- Do not invent legal sources, article numbers, or case law.\n"
     )
-
+  
     messages: List[Dict[str, str]] = [
         {"role": "system", "content": system}
     ]
