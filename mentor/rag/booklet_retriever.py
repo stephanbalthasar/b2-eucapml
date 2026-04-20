@@ -479,10 +479,14 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
     for concept in gaz.concepts:
         c_lc = concept.lower()
         if c_lc in phrase_set:
+            canon = concept
+            expanded = _expand_aliases({canon}, gaz.alias_map)
+            
             signals.append({
                 "type": "concept",
                 "surface": concept,
-                "canonical": concept,
+                "canonical": canon,
+                "expanded": expanded,     # ✅ REQUIRED
                 "confidence": W_GAZ_EXACT,
             })
             matched_phrases.add(c_lc)
