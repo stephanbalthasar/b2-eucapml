@@ -107,6 +107,7 @@ def build_followup_messages(previous_feedback: str, followup_question: str,
 
 from typing import List, Dict, Optional
 
+
 def build_conversational_tutor_messages(
     *,
     conversation: List[Dict[str, str]],
@@ -116,17 +117,8 @@ def build_conversational_tutor_messages(
     """
     Build the canonical prompt for conversational tutoring in EU/German
     capital markets law.
-
-    Core invariants:
-    - The FULL conversation transcript is always included.
-    - Assistant turns are first-class context.
-    - Retrieval is OPTIONAL and ADDITIVE.
-    - Prompt structure NEVER depends on routing mode.
     """
 
-    # -----------------------------
-    # System instruction
-    # -----------------------------
     system = (
         "You are an AI tutor for EU and German capital markets law.\n"
         "Answer accurately, clearly, and in a legally precise manner.\n\n"
@@ -143,72 +135,46 @@ def build_conversational_tutor_messages(
         "naturally and briefly without introducing legal analysis.\n"
         "- Do not invent legal sources, article numbers, or case law.\n"
     )
-  
+
     messages: List[Dict[str, str]] = [
         {"role": "system", "content": system}
     ]
 
-    # -----------------------------
-    # Conversation transcript
-    # -----------------------------
-    # We pass the conversation verbatim, preserving roles and order.
-    # Trimming (if any) must happen BEFORE calling this function.
     if conversation:
         messages.append(
-            {
-                "role": "system",
-                "content": "Conversation so far:",
-            }
+            {"role": "system", "content": "Conversation so far:"}
         )
         for turn in conversation:
-            # Expecting shape: {"role": "user"|"assistant", "content": "..."}
             messages.append(
-                {
-                    "role": turn["role"],
-                    "content": turn["content"],
-                }
+                {"role": turn["role"], "content": turn["content"]}
             )
 
-    # -----------------------------
-    # Optional retrieved materials
-    # -----------------------------
-    materials_blocks: List[str] = []
+    materials = []
 
     if retrieved_booklet_chunks:
-        cleaned = [c.strip() for c in retrieved_booklet_chunks if c.strip()]
-        if cleaned:
-            materials_blocks.append(
-                "RELEVANT COURSE MATERIAL (Booklet excerpts):\n"
-                + "\n\n".join(f"- {c}" for c in cleaned)
-            )
-
-    if retrieved_web_snippets:
-        cleaned = [w.strip() for w in retrieved_web_snippets if w.strip()]
-        if cleaned:
-            materials_blocks.append(
-                "RELEVANT EXTERNAL MATERIAL (for context only):\n"
-                + "\n\n".join(f"- {w}" for w in cleaned)
-            )
-
-    if materials_blocks:
-        messages.append(
-            {
-                "role": "system",
-                "content": "\n\n".join(materials_blocks),
-            }
+        materials.append(
+            "RELEVANT COURSE MATERIAL (Booklet excerpts):\n"
+            + "\n\n".join(f"- {c}" for c in retrieved_booklet_chunks)
         )
 
-    # -----------------------------
-    # Final instruction
-    # -----------------------------
+    if retrieved_web_snippets:
+        materials.append(
+            "RELEVANT EXTERNAL MATERIAL:\n"
+            + "\n\n".join(f"- {w}" for w in retrieved_web_snippets)
+        )
+
+    if materials:
+        messages.append(
+            {"role": "system", "content": "\n\n".join(materials)}
+        )
+
     messages.append(
         {
             "role": "system",
             "content": (
                 "Task:\n"
-                "Using the conversation above and, where provided, the relevant "
-                "materials, answer the user's latest input.\n"
-                "Do not restate the conversation. Be concise but legally precise."
+                "Using the conversation above and any provided materials, "
+                "answer the user's latest input."
             ),
         }
     )
