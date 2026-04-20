@@ -724,37 +724,18 @@ with tab_feedback:
 with tab_chat:
         
     def on_ask_tutor(user_q: str, history: List[Dict[str, Any]]) -> str:
-        # Optional: keep your student usage ping
+        # Optional: student usage logging
         if st.session_state.get("role") == "student":
             update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "CHAT", "student"])
-        
-        # --- NEW: capture signals for the sidebar debugger ---
-        try:
-            sigs = extract_signals(
-                user_q,
-                gaz=para_retriever.gaz,            # your ParagraphRetriever exposes gaz
-                corpus_auto_alias=para_retriever.alias_bi,  # merged alias graph
-            )
-            # Normalize to a printable structure (don’t mutate original dicts)
-            cleaned = []
-            for s in (sigs or []):
-                cleaned.append({
-                    "type": s.get("type"),
-                    "surface": s.get("surface"),
-                    "canonical": s.get("canonical"),
-                    "confidence": round(float(s.get("confidence", 0.0)), 3),
-                    # Keep a short preview of the expanded set for readability
-                    "expanded_preview": ", ".join(sorted(list(s.get("expanded", set())))[:6]),
-                })
-            st.session_state["_last_signals"] = cleaned
-        except Exception as e:
-            # Keep UX resilient; store the error so you can see it in the panel
-            st.session_state["_last_signals"] = [{"type": "ERROR", "surface": "", "canonical": str(e), "confidence": 0.0, "expanded_preview": ""}]
-
-        # Heuristic router (no LLM): counts gazetteer hits (exact or fuzzy)
-        # --- Router decision ---
-                
-        # Pass to router
+    
+        # --------------------------------------------------
+        # ✅ DEFINE the conversation (this was missing)
+        # --------------------------------------------------
+        conversation = history + [{"role": "user", "content": user_q}]
+    
+        # --------------------------------------------------
+        # Router decision (augmentation-only)
+        # --------------------------------------------------
         decision = route(
             user_query=user_q,
             recent_user_messages=[
@@ -763,6 +744,38 @@ with tab_chat:
                 if m["role"] == "user"
             ],
         )
+    
+        st.session_state["_last_router_decision"] = {
+            "mode": decision.get("mode"),
+            "conf": decision.get("total_conf"),
+            "label": decision.get("ui_label"),
+            "v": decision.get("router_version"),
+        }
+    
+        # --------------------------------------------------
+        # Optional retrieval
+        # --------------------------------------------------
+        retrieved_booklet_chunks = None
+        retrieved_web_snippets = None
+    
+        if decision.get("mode") == "rag":
+            retrieved_booklet_chunks = para_retriever.retrieve(
+                conversation=conversation,
+                top_k=5,
+            )
+    
+        # --------------------------------------------------
+        # Unified ChatEngine call
+        # --------------------------------------------------
+        return chat_engine.answer(
+            conversation=conversation,
+            retrieved_booklet_chunks=retrieved_booklet_chunks,
+            retrieved_web_snippets=retrieved_web_snippets,
+            model=model,
+            temperature=temp,
+            max_tokens=700,
+        )
+   
         
         # Store for debugger if needed
         st.session_state["_last_router_decision"] = {
