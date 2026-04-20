@@ -97,7 +97,6 @@ def build_followup_messages(previous_feedback: str, followup_question: str,
         "If relevant booklet excerpts are provided below, "
         "base your answer strictly on them. "
         "Do NOT invent case law, holdings, or legal rules."
-)
     )
     user = (
         f"PREVIOUS FEEDBACK:\n\"\"\"{(previous_feedback or '').strip()}\"\"\"\n\n"
