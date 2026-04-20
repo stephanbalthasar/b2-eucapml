@@ -102,7 +102,7 @@ def build_followup_messages(previous_feedback: str, followup_question: str,
             {"role": "user",   "content": user}]
 
 
-
+## deprecated##
 def build_tutor_messages(*,
                          user_query: str,
                          booklet_chunks: List[str],
@@ -133,7 +133,7 @@ def build_tutor_messages(*,
         {"role": "user", "content": user_content},
     ]
 # ---------------------------------------------------------------------------
-# Assistant (Chat Mode) Prompt
+# Assistant (Chat Mode) Prompt (deprecated)
 # ---------------------------------------------------------------------------
 def build_assistant_messages(user_query: str) -> list:
     """
@@ -168,3 +168,75 @@ def build_assistant_messages(user_query: str) -> list:
         {"role": "system", "content": system_msg},
         {"role": "user", "content": user_query},
     ]
+
+# ============================================================
+# Canonical Conversational Tutor Prompt
+# ============================================================
+
+from typing import List, Dict, Optional
+
+
+def build_conversational_tutor_messages(
+    *,
+    conversation: List[Dict[str, str]],
+    retrieved_booklet_chunks: Optional[List[str]] = None,
+    retrieved_web_snippets: Optional[List[str]] = None,
+) -> List[Dict[str, str]]:
+    """
+    Build the canonical prompt for conversational tutoring in EU/German
+    capital markets law.
+
+    Core invariants:
+    - The FULL conversation transcript is always included.
+    - Assistant turns are first-class context.
+    - Retrieval is OPTIONAL and ADDITIVE.
+    - Prompt structure NEVER depends on routing mode.
+    """
+
+    # -----------------------------
+    # System instruction
+    # -----------------------------
+    system = (
+        "You are an AI tutor for EU and German capital markets law.\n"
+        "Answer accurately, clearly, and in a legally precise manner.\n\n"
+        "Conversation rules:\n"
+        "- Treat the prior conversation as binding context.\n"
+        "- If the conversation clarifies the applicable legal framework "
+        "(e.g. MAR, MiFID II, Prospectus Regulation), apply that framework "
+        "and do not reopen it unless the user explicitly does so.\n"
+        "- If the user input is conversational (e.g. a greeting), respond "
+        "naturally and do not introduce legal analysis or sources.\n"
+        "- Do not invent legal sources, article numbers, or case law.\n"
+    )
+
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": system}
+    ]
+
+    # -----------------------------
+    # Conversation transcript
+    # -----------------------------
+    # We pass the conversation verbatim, preserving roles and order.
+    # Trimming (if any) must happen BEFORE calling this function.
+    if conversation:
+        messages.append(
+            {
+                "role": "system",
+                "content": "Conversation so far:",
+            }
+        )
+        for turn in conversation:
+            # Expecting shape: {"role": "user"|"assistant", "content": "..."}
+            messages.append(
+                {
+                    "role": turn["role"],
+                    "content": turn["content"],
+                }
+            )
+
+    # -----------------------------
+    # Optional retrieved materials
+    # -----------------------------
+    materials_blocks: List[str] = []
+
+    if retrieved_booklet_chunks:
