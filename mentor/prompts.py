@@ -92,6 +92,12 @@ def build_followup_messages(previous_feedback: str, followup_question: str,
     system = (
         "You answer follow‑up questions about previous feedback. Be precise, "
         f"≤ {max_words} words. If something depends on facts, say what you would check."
+        "You answer follow-up questions about previous exam feedback. "
+        "Be precise and exam-focused. "
+        "If relevant booklet excerpts are provided below, "
+        "base your answer strictly on them. "
+        "Do NOT invent case law, holdings, or legal rules."
+)
     )
     user = (
         f"PREVIOUS FEEDBACK:\n\"\"\"{(previous_feedback or '').strip()}\"\"\"\n\n"
