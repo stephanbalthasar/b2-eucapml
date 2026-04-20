@@ -753,10 +753,17 @@ with tab_chat:
         retrieved_web_snippets = None
     
         if decision.get("mode") == "rag":
-            retrieved_booklet_chunks = para_retriever.search(
+            hits = para_retriever.search(
                 retrieval_query,
                 top_k=5,
             )
+            
+            # ✅ Normalize to List[str] for ChatEngine (robust & future-proof)
+            retrieved_booklet_chunks = [
+                (h.get("text") if isinstance(h, dict) else str(h))
+                for h in hits
+                if h
+            ]            
     
         # --------------------------------------------------
         # Unified ChatEngine call
