@@ -20,16 +20,12 @@ class ChatEngine:
         self,
         *,
         llm,
+        booklet_index=None,        # kept for backward compatibility
         booklet_retriever=None,
         web_retriever=None,
     ):
-        """
-        Parameters:
-        - llm: LLM client exposing a .chat(messages, ...) method
-        - booklet_retriever / web_retriever:
-          kept for compatibility; retrieval is triggered externally
-        """
         self.llm = llm
+        self.booklet_index = booklet_index
         self.booklet_retriever = booklet_retriever
         self.web_retriever = web_retriever
 
@@ -46,16 +42,6 @@ class ChatEngine:
         temperature: float = 0.2,
         max_tokens: int = 700,
     ) -> str:
-        """
-        Produce the next assistant message.
-
-        Required:
-        - conversation: full transcript, ordered, with roles
-
-        Optional:
-        - retrieved_booklet_chunks
-        - retrieved_web_snippets
-        """
 
         if not conversation:
             raise ValueError(
@@ -86,10 +72,6 @@ class ChatEngine:
         temperature: float = 0.6,
         max_tokens: int = 350,
     ) -> str:
-        """
-        Convenience wrapper for conversational replies without retrieval.
-        Semantically identical to answer().
-        """
 
         return self.answer(
             conversation=conversation,
