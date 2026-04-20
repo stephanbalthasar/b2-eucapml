@@ -769,8 +769,14 @@ with tab_chat:
         retrieved_web_snippets = None
     
         if decision.get("mode") == "rag":
-            retrieved_booklet_chunks = para_retriever.retrieve(
-                conversation=conversation,
+            
+            retrieval_query = " ".join(
+                f"{m['role']}: {m['content']}"
+                for m in conversation
+            )
+
+            retrieved_booklet_chunks = para_retriever.search(
+                retrieval_query,
                 top_k=5,
             )
     
