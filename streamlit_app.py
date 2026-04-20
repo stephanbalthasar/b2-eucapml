@@ -700,6 +700,40 @@ with tab_chat:
             f"{m['role']}: {m['content']}"
             for m in conversation
         )
+        # --------------------------------------------------
+        # ✅ Signal debugger: extract signals from canonical query
+        # --------------------------------------------------
+        try:
+            sigs = extract_signals(
+                retrieval_query,
+                gaz=para_retriever.gaz,
+                corpus_auto_alias=para_retriever.alias_bi,
+            )
+        
+            # Normalize for sidebar display (same shape as yesterday)
+            cleaned = []
+            for s in (sigs or []):
+                cleaned.append({
+                    "type": s.get("type"),
+                    "surface": s.get("surface"),
+                    "canonical": s.get("canonical"),
+                    "confidence": round(float(s.get("confidence", 0.0)), 3),
+                    "expanded_preview": ", ".join(
+                        sorted(list(s.get("expanded", set())))[:6]
+                    ),
+                })
+        
+            st.session_state["_last_signals"] = cleaned
+        
+        except Exception as e:
+            # Never let debugging break the chat
+            st.session_state["_last_signals"] = [{
+                "type": "ERROR",
+                "surface": "",
+                "canonical": str(e),
+                "confidence": 0.0,
+                "expanded_preview": "",
+            }]
         
         decision = route(
             user_query=retrieval_query,            
