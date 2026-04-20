@@ -686,26 +686,26 @@ with tab_feedback:
                     # --------------------------------------------------
                     # Optional retrieval
                     # --------------------------------------------------
-                    def conversation_to_retrieval_query(conversation):
-                        """
-                        Convert the full conversation into a retrieval-safe query string.
-                        Keeps semantic context (including assistant clarifications).
-                        """
-                        return " ".join(
-                            f"{m['role']}: {m['content']}"
-                            for m in conversation
-                            if m["role"] in ("user", "assistant")
+                    def conversation_to_text(conversation):
+                        return "\n".join(
+                            m["content"] for m in conversation if m.get("content")
                         )
+                    
                     retrieved_booklet_chunks = None
                     retrieved_web_snippets = None
                 
                     if decision["mode"] == "rag":
-                        retrieval_query = conversation_to_retrieval_query(conversation)
-                        retrieved_booklet_chunks = para_retriever.search(
+                        retrieval_query = conversation_to_text(conversation)
+                    
+                        hits = para_retriever.search(
                             retrieval_query,
                             top_k=5,
                         )
-                                    
+                    
+                        retrieved_booklet_chunks = [
+                            h["text"] for h in hits if h.get("text")
+                        ]
+                                                        
                         # If you later turn web retrieval back on, it plugs in here
                         retrieved_web_snippets = None
                 
