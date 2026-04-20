@@ -692,14 +692,17 @@ with tab_chat:
         # --------------------------------------------------
         conversation = history + [{"role": "user", "content": user_q}]
 
-        conversation_text = " ".join(
-            m["content"] for m in conversation if m.get("content")
-        )
+
         # --------------------------------------------------
         # Router decision (augmentation-only)
         # --------------------------------------------------
+        retrieval_query = " ".join(
+            f"{m['role']}: {m['content']}"
+            for m in conversation
+        )
+        
         decision = route(
-            user_query=conversation_text,            
+            user_query=retrieval_query,            
         )
     
         st.session_state["_last_router_decision"] = {
@@ -716,12 +719,6 @@ with tab_chat:
         retrieved_web_snippets = None
     
         if decision.get("mode") == "rag":
-            
-            retrieval_query = " ".join(
-                f"{m['role']}: {m['content']}"
-                for m in conversation
-            )
-
             retrieved_booklet_chunks = para_retriever.search(
                 retrieval_query,
                 top_k=5,
