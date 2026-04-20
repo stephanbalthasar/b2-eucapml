@@ -757,7 +757,11 @@ with tab_chat:
         # Pass to router
         decision = route(
             user_query=user_q,
-            recent_user_messages=recent_user_msgs
+            recent_user_messages=[
+                m["content"]
+                for m in conversation
+                if m["role"] == "user"
+            ],
         )
         
         # Store for debugger if needed
