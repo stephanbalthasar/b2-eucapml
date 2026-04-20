@@ -691,17 +691,15 @@ with tab_chat:
         # ✅ DEFINE the conversation (this was missing)
         # --------------------------------------------------
         conversation = history + [{"role": "user", "content": user_q}]
-    
+
+        conversation_text = " ".join(
+            m["content"] for m in conversation if m.get("content")
+        )
         # --------------------------------------------------
         # Router decision (augmentation-only)
         # --------------------------------------------------
         decision = route(
-            user_query=user_q,
-            recent_user_messages=[
-                m["content"]
-                for m in conversation
-                if m["role"] == "user"
-            ],
+            user_query=conversation_text,            
         )
     
         st.session_state["_last_router_decision"] = {
