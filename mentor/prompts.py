@@ -87,24 +87,36 @@ def build_plan_messages(case_text: str,
     return [{"role": "system", "content": system},
             {"role": "user",   "content": user}]
 
-def build_followup_messages(previous_feedback: str, followup_question: str,
-                            max_words: int = FOLLOWUP_MAX_WORDS) -> list[dict]:
+def build_followup_messages(
+    previous_feedback: str,
+    followup_question: str,
+    booklet_chunks: list[str] | None = None,
+    max_words: int = FOLLOWUP_MAX_WORDS,
+):
     system = (
-        "You answer follow‑up questions about previous feedback. Be precise, "
-        f"≤ {max_words} words. If something depends on facts, say what you would check."
         "You answer follow-up questions about previous exam feedback. "
-        "Be precise and exam-focused. "
-        "If relevant booklet excerpts are provided below, "
+        "Be precise, exam-focused, and concise "
+        f"(≤ {max_words} words). "
+        "If authoritative booklet excerpts are provided below, "
         "base your answer strictly on them. "
-        "Do NOT invent case law, holdings, or legal rules."
+        "Do NOT invent case law, legal rules, or article numbers."
     )
+
     user = (
-        f"PREVIOUS FEEDBACK:\n\"\"\"{(previous_feedback or '').strip()}\"\"\"\n\n"
-        f"STUDENT'S FOLLOW‑UP QUESTION:\n{(followup_question or '').strip()}\n\n"
-        "Answer clearly. If the student asks for the model answer, politely refuse and re‑explain the principle."
+        f"PREVIOUS FEEDBACK:\n{previous_feedback}\n\n"
+        f"STUDENT FOLLOW-UP QUESTION:\n{followup_question}"
     )
-    return [{"role": "system", "content": system},
-            {"role": "user",   "content": user}]
+
+    if booklet_chunks:
+        user += (
+            "\n\nAUTHORITATIVE BOOKLET EXCERPTS:\n"
+            + "\n\n".join(booklet_chunks)
+        )
+
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
 
 # ============================================================
 # Canonical Conversational Tutor Prompt
