@@ -648,28 +648,69 @@ with tab_feedback:
             # -----------------------------
             # --- Follow-up discussion (reuses the same conversation component) ---
             with st.container():
-                def on_ask_followup(user_q: str, history: List[Dict[str, Any]]) -> str:
-                    # Build the history in the legacy tuple format that your feedback_engine expects
-                    tuple_hist = [
-                        ("student" if m["role"] == "user" else "tutor", m["content"])
-                        for m in history
-                    ]
-                    context = {
-                        "student_answer": st.session_state.get("exam_answer", ""),
-                        "feedback": st.session_state.get("exam_feedback", ""),
-                        "history": tuple_hist,
-                    }
-                    # Keep your audit behavior: log only for students
+                def on_ask_tutor(user_q: str, history: List[Dict[str, Any]]) -> str:
+                    """
+                    Tutor chat handler.
+                    - Uses full conversation transcript
+                    - Routing only controls retrieval
+                    - Prompt structure is invariant
+                    """
+                
+                    # Log student usage (unchanged)
                     if st.session_state.get("role") == "student":
-                        update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "FOLLOW_UP", "student"])
-            
-                    return feedback_engine.follow_up_with_history(
-                        question=user_q,
-                        context=context,
+                        update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "CHAT", "student"])
+                
+                    # --------------------------------------------------
+                    # Full conversation transcript (authoritative)
+                    # --------------------------------------------------
+                    # history already contains all prior turns
+                    conversation = history + [{"role": "user", "content": user_q}]
+                
+                    # --------------------------------------------------
+                    # Router decision (augmentation-only)
+                    # --------------------------------------------------
+                    decision = route(
+                        user_query=user_q,
+                        recent_user_messages=[
+                            m["content"] for m in conversation if m["role"] == "user"
+                        ],
+                    )
+                
+                    st.session_state["_last_router_decision"] = {
+                        "mode": decision.get("mode"),
+                        "conf": decision.get("total_conf"),
+                        "label": decision.get("ui_label"),
+                        "v": decision.get("router_version"),
+                    }
+                
+                    # --------------------------------------------------
+                    # Optional retrieval
+                    # --------------------------------------------------
+                    retrieved_booklet_chunks = None
+                    retrieved_web_snippets = None
+                
+                    if decision["mode"] == "rag":
+                        # Booklet retrieval can (and should) use the conversation semantics
+                        retrieved_booklet_chunks = para_retriever.retrieve(
+                            conversation=conversation,
+                            top_k=5,
+                        )
+                
+                        # If you later turn web retrieval back on, it plugs in here
+                        retrieved_web_snippets = None
+                
+                    # --------------------------------------------------
+                    # Unified ChatEngine call (NO branching by mode)
+                    # --------------------------------------------------
+                    return chat_engine.answer(
+                        conversation=conversation,
+                        retrieved_booklet_chunks=retrieved_booklet_chunks,
+                        retrieved_web_snippets=retrieved_web_snippets,
                         model=model,
                         temperature=temp,
+                        max_tokens=700,
                     )
-            
+                            
                 # Use the same state key you already reset after evaluation to avoid surprises
                 render_conversation(
                     state_key="chat_history",  # we keep the same key to preserve behavior / resets
@@ -681,11 +722,7 @@ with tab_feedback:
 
 # --- Tutor chat (separate, uncluttered) ---
 with tab_chat:
-    def build_combined_query(recent_msgs, current_msg, window=3):
-        msgs = recent_msgs[-(window - 1):] + [current_msg]
-        # Clean combination: just stitch the raw user messages
-        return " ".join(msgs)
-    
+        
     def on_ask_tutor(user_q: str, history: List[Dict[str, Any]]) -> str:
         # Optional: keep your student usage ping
         if st.session_state.get("role") == "student":
@@ -716,11 +753,7 @@ with tab_chat:
 
         # Heuristic router (no LLM): counts gazetteer hits (exact or fuzzy)
         # --- Router decision ---
-        # Build list of last user messages (not including current)
-        recent_user_msgs = [
-            m["content"] for m in history if m["role"] == "user"
-        ]
-        
+                
         # Pass to router
         decision = route(
             user_query=user_q,
