@@ -153,7 +153,6 @@ def build_conversational_tutor_messages(
         "If the user describes a factual scenario, you should apply the relevant legal"
         "principles as described in the provided booklet excerpts and explain the"
         "general legal assessment and possible consequences for educational purposes."
-        "You must not give personalised legal advice or recommend specific actions."
         "If the user asks a legal question, but does not provide enough context, you must NOT answer it. "
         "Instead, politely ask for clarification.\n\n"
     )
