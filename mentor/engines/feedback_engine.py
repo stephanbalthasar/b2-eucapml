@@ -49,31 +49,35 @@ class FeedbackEngine:
         )
         return raw if isinstance(raw, str) else str(raw)
 
-    # -------------------------------------------------------
-    # (iii) Follow-up questions about the feedback
-    # -------------------------------------------------------
-    
-    def follow_up_with_history(self, question, context, model, temperature):
-        messages = []
-    
-        # Inject core context
-        messages.append({"role": "system", "content": f"Student exam answer:\n{context['student_answer']}"})
-        messages.append({"role": "system", "content": f"Feedback:\n{context['feedback']}"})
-    
-        # Prior chat turns
-        for role, msg in context["history"]:
-            messages.append({
-                "role": "user" if role == "student" else "assistant",
-                "content": msg
-            })
-    
-        # Current question
-        messages.append({"role": "user", "content": question})
-    
-        # LLM call
+    # ---------------------------------------------------------------------
+    # ✅ FIXED: Exam follow-up WITH OPTIONAL GROUNDING
+    # ---------------------------------------------------------------------
+    def follow_up_with_history(
+        self,
+        question: str,
+        context: Dict[str, Any],
+        booklet_chunks: Optional[List[str]] = None,
+        model: str = None,
+        temperature: float = 0.2,
+    ) -> str:
+        """
+        Handle follow-up questions after exam feedback.
+
+        IMPORTANT DESIGN DECISION:
+        - This method does NOT decide whether retrieval is necessary.
+        - If booklet_chunks are provided, the prompt will enforce strict grounding.
+        - If no booklet_chunks are provided, the model may only reason about
+          the evaluation and feedback itself.
+        """
+
+        messages = build_followup_messages(
+            previous_feedback=context.get("feedback", ""),
+            followup_question=question,
+            booklet_chunks=booklet_chunks,
+        )
+
         return self.llm.chat(
             messages=messages,
             model=model,
             temperature=temperature,
-            max_tokens=800
         )

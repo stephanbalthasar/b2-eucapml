@@ -335,6 +335,18 @@ def _wordish_tokens(q: str) -> List[str]:
     q = _norm_ws_hyphen(q)
     return re.findall(r"[A-Za-zÄÖÜäöüß0-9\-/]+", q)
 
+def _ngrams(tokens: List[str], max_n: int = 3) -> List[str]:
+    """
+    Generate contiguous n-grams (longest first).
+    """
+    out: List[str] = []
+    L = len(tokens)
+    for n in range(max_n, 0, -1):  # 3, 2, 1
+        for i in range(L - n + 1):
+            phrase = " ".join(tokens[i:i+n])
+            out.append(phrase)
+    return out
+
 def _expand_aliases(seed: Set[str], alias_bi: Dict[str, Set[str]]) -> Set[str]:
     out = set(seed)
     for s in list(seed):
@@ -455,9 +467,30 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
     q = _norm_ws_hyphen(query or "")
     if not q:
         return []
+    q_lc = q.lower()
+    tokens = _wordish_tokens(q)
+    phrases = _ngrams(tokens, max_n=3)   # <-- NEW
+    phrase_lc = [p.lower() for p in phrases]
+    phrase_set = set(phrase_lc)
 
     signals: List[Dict] = []
-
+    matched_phrases: Set[str] = set()
+    
+    for concept in gaz.concepts:
+        c_lc = concept.lower()
+        if c_lc in phrase_set:
+            canon = concept
+            expanded = _expand_aliases({canon}, gaz.alias_map)
+            
+            signals.append({
+                "type": "concept",
+                "surface": concept,
+                "canonical": canon,
+                "expanded": expanded,     # ✅ REQUIRED
+                "confidence": W_GAZ_EXACT,
+            })
+            matched_phrases.add(c_lc)
+    
     for m in RE_SECTION.finditer(q):
         s = m.group(0)
         signals.append(dict(type="section", surface=s, canonical=s,
@@ -601,6 +634,19 @@ def extract_signals(query: str, gaz: Gazetteers, corpus_auto_alias: Dict[str, Se
         if key not in seen:
             seen.add(key)
             out.append(s)
+    # ---------------------------------------------------------
+    # STEP 4: Suppress sub-phrase signals (longest match wins)
+    # ---------------------------------------------------------
+
+    canonicals = [s["canonical"].lower() for s in out]
+
+    def _is_subphrase(p: str) -> bool:
+        return any(p != other and p in other for other in canonicals)
+
+    out = [
+        s for s in out
+        if not _is_subphrase(s["canonical"].lower())
+    ]
     return out
 
 

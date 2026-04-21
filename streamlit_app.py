@@ -662,10 +662,26 @@ with tab_feedback:
                     # Keep your audit behavior: log only for students
                     if st.session_state.get("role") == "student":
                         update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "FOLLOW_UP", "student"])
-            
+
+                    # Build retrieval query from follow-up + feedback
+                    retrieval_query = (
+                        f"FOLLOW-UP QUESTION:\n{user_q}\n\n"
+                        f"EXAMINER FEEDBACK:\n{st.session_state.get('exam_feedback', '')}"
+                    )
+                    
+                    # Retrieve booklet chunks
+                    hits = para_retriever.search(retrieval_query, top_k=8)
+                    
+                    # Normalize to List[str]
+                    booklet_chunks = [
+                        (h.get("text") if isinstance(h, dict) else str(h))
+                        for h in hits if h
+                    ]
+                    
                     return feedback_engine.follow_up_with_history(
                         question=user_q,
                         context=context,
+                        booklet_chunks=booklet_chunks,
                         model=model,
                         temperature=temp,
                     )
@@ -681,24 +697,36 @@ with tab_feedback:
 
 # --- Tutor chat (separate, uncluttered) ---
 with tab_chat:
-    def build_combined_query(recent_msgs, current_msg, window=3):
-        msgs = recent_msgs[-(window - 1):] + [current_msg]
-        # Clean combination: just stitch the raw user messages
-        return " ".join(msgs)
-    
+        
     def on_ask_tutor(user_q: str, history: List[Dict[str, Any]]) -> str:
-        # Optional: keep your student usage ping
+        # Optional: student usage logging
         if st.session_state.get("role") == "student":
             update_gist([time.strftime("%Y-%m-%d %H:%M:%S"), "CHAT", "student"])
-        
-        # --- NEW: capture signals for the sidebar debugger ---
+    
+        # --------------------------------------------------
+        # ✅ DEFINE the conversation (this was missing)
+        # --------------------------------------------------
+        conversation = history + [{"role": "user", "content": user_q}]
+
+
+        # --------------------------------------------------
+        # Router decision (augmentation-only)
+        # --------------------------------------------------
+        retrieval_query = " ".join(
+            f"{m['role']}: {m['content']}"
+            for m in conversation
+        )
+        # --------------------------------------------------
+        # ✅ Signal debugger: extract signals from canonical query
+        # --------------------------------------------------
         try:
             sigs = extract_signals(
-                user_q,
-                gaz=para_retriever.gaz,            # your ParagraphRetriever exposes gaz
-                corpus_auto_alias=para_retriever.alias_bi,  # merged alias graph
+                retrieval_query,
+                gaz=para_retriever.gaz,
+                corpus_auto_alias=para_retriever.alias_bi,
             )
-            # Normalize to a printable structure (don’t mutate original dicts)
+        
+            # Normalize for sidebar display (same shape as yesterday)
             cleaned = []
             for s in (sigs or []):
                 cleaned.append({
@@ -706,26 +734,65 @@ with tab_chat:
                     "surface": s.get("surface"),
                     "canonical": s.get("canonical"),
                     "confidence": round(float(s.get("confidence", 0.0)), 3),
-                    # Keep a short preview of the expanded set for readability
-                    "expanded_preview": ", ".join(sorted(list(s.get("expanded", set())))[:6]),
+                    "expanded_preview": ", ".join(
+                        sorted(list(s.get("expanded", set())))[:6]
+                    ),
                 })
-            st.session_state["_last_signals"] = cleaned
-        except Exception as e:
-            # Keep UX resilient; store the error so you can see it in the panel
-            st.session_state["_last_signals"] = [{"type": "ERROR", "surface": "", "canonical": str(e), "confidence": 0.0, "expanded_preview": ""}]
-
-        # Heuristic router (no LLM): counts gazetteer hits (exact or fuzzy)
-        # --- Router decision ---
-        # Build list of last user messages (not including current)
-        recent_user_msgs = [
-            m["content"] for m in history if m["role"] == "user"
-        ]
         
-        # Pass to router
+            st.session_state["_last_signals"] = cleaned
+        
+        except Exception as e:
+            # Never let debugging break the chat
+            st.session_state["_last_signals"] = [{
+                "type": "ERROR",
+                "surface": "",
+                "canonical": str(e),
+                "confidence": 0.0,
+                "expanded_preview": "",
+            }]
+        
         decision = route(
-            user_query=user_q,
-            recent_user_messages=recent_user_msgs
+            user_query=retrieval_query,            
         )
+    
+        st.session_state["_last_router_decision"] = {
+            "mode": decision.get("mode"),
+            "conf": decision.get("total_conf"),
+            "label": decision.get("ui_label"),
+            "v": decision.get("router_version"),
+        }
+    
+        # --------------------------------------------------
+        # Optional retrieval
+        # --------------------------------------------------
+        retrieved_booklet_chunks = None
+        retrieved_web_snippets = None
+    
+        if decision.get("mode") == "rag":
+            hits = para_retriever.search(
+                retrieval_query,
+                top_k=5,
+            )
+            
+            # ✅ Normalize to List[str] for ChatEngine (robust & future-proof)
+            retrieved_booklet_chunks = [
+                (h.get("text") if isinstance(h, dict) else str(h))
+                for h in hits
+                if h
+            ]            
+    
+        # --------------------------------------------------
+        # Unified ChatEngine call
+        # --------------------------------------------------
+        return chat_engine.answer(
+            conversation=conversation,
+            retrieved_booklet_chunks=retrieved_booklet_chunks,
+            retrieved_web_snippets=retrieved_web_snippets,
+            model=model,
+            temperature=temp,
+            max_tokens=700,
+        )
+   
         
         # Store for debugger if needed
         st.session_state["_last_router_decision"] = {
