@@ -432,7 +432,6 @@ with st.sidebar:
         "Model",
         ["openai/gpt-oss-20b"],
         index=0,
-        ,
     )
 
     temp = st.slider(
