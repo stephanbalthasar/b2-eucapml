@@ -33,7 +33,7 @@ if MAINTENANCE_MODE:
         B's Bot is currently undergoing maintenance and quality improvements to ensure high-quality
         support for students.
 
-        We expect the bot to be operational again by end of October.
+        We expect the bot to be operational again by 31 October 2026.
 
         Thank you for your patience.
         """
