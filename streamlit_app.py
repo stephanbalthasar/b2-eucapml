@@ -30,12 +30,10 @@ if MAINTENANCE_MODE:
     st.title("🚧 B's Bot Under Review")
     st.info(
         """
-        B's Bot is currently undergoing maintenance and quality improvements.
-
-        We are reviewing the AI feedback functionality to ensure high-quality
+        B's Bot is currently undergoing maintenance and quality improvements to ensure high-quality
         support for students.
 
-        Please check back soon.
+        We expect the bot to be operational again by end of October.
 
         Thank you for your patience.
         """
