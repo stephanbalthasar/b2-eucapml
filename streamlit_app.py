@@ -430,13 +430,9 @@ with st.sidebar:
 
     model = st.selectbox(
         "Model",
-        ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"],
+        ["openai/gpt-oss-20b"],
         index=0,
-        help=(
-            "Model choice:\n"
-            "• llama‑3.1‑8b‑instant → faster, cheaper; good for drafts and everyday Q&A.\n"
-            "• llama‑3.3‑70b‑versatile → slower, more capable; better for nuanced legal analysis."
-        ),
+        ,
     )
 
     temp = st.slider(
@@ -828,7 +824,7 @@ with tab_chat:
         else:
             answer = chat_engine.assist(
                 user_query=user_q,
-                model="llama-3.1-8b-instant",
+                model="openai/gpt-oss-20b",
                 temperature=0.6,
                 max_tokens=350,
             )
