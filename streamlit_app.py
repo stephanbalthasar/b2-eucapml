@@ -447,7 +447,7 @@ with st.sidebar:
 
     model = st.selectbox(
         "Model",
-        ["qwen/qwen3-32b"],
+        ["qwen/qwen3.6-27b"],
         index=0,
     )
 
