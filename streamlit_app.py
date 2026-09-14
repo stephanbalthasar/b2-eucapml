@@ -20,7 +20,7 @@ from app.router import route
 from mentor.rag.booklet_retriever import extract_signals
 # ───────────────────────────────────────────────────────────────────────────────
 
-MAINTENANCE_MODE = True
+MAINTENANCE_MODE = False
 
 if MAINTENANCE_MODE:
     st.set_page_config(page_title="B's Bot")
