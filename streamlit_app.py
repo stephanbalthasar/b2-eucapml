@@ -447,7 +447,7 @@ with st.sidebar:
 
     model = st.selectbox(
         "Model",
-        ["qwen/qwen3.6-27b"],
+        ["qwen/qwen3.8-27b"],
         index=0,
     )
 
@@ -840,7 +840,7 @@ with tab_chat:
         else:
             answer = chat_engine.assist(
                 user_query=user_q,
-                model="openai/gpt-oss-20b",
+                model=model,
                 temperature=0.6,
                 max_tokens=350,
             )
