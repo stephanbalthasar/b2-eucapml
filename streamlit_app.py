@@ -449,7 +449,7 @@ with st.sidebar:
 
     model = st.selectbox(
         "Model",
-        ["openai/gpt-oss-20b"],
+        ["qwen/qwen3-32b"],
         index=0,
     )
 
