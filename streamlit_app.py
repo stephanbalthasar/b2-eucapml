@@ -20,7 +20,7 @@ from app.router import route
 from mentor.rag.booklet_retriever import extract_signals
 # ───────────────────────────────────────────────────────────────────────────────
 
-MAINTENANCE_MODE = False
+MAINTENANCE_MODE = st.secrets.get("MAINTENANCE_MODE", False)
 
 if MAINTENANCE_MODE:
     st.set_page_config(page_title="B's Bot")
@@ -28,12 +28,10 @@ if MAINTENANCE_MODE:
     st.title("🚧 B's Bot Under Review")
     st.info(
         """
-        B's Bot is currently undergoing maintenance and quality improvements.
-
-        We are reviewing the AI feedback functionality to ensure high-quality
+        B's Bot is currently undergoing maintenance and quality improvements to ensure high-quality
         support for students.
 
-        Please check back soon.
+        We expect the bot to be operational again by 31 October 2026.
 
         Thank you for your patience.
         """
