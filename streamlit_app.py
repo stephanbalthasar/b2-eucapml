@@ -20,26 +20,6 @@ from app.router import route
 from mentor.rag.booklet_retriever import extract_signals
 # ───────────────────────────────────────────────────────────────────────────────
 
-import streamlit as st
-
-MAINTENANCE_MODE = st.secrets.get("MAINTENANCE_MODE", False)
-
-if MAINTENANCE_MODE:
-    st.set_page_config(page_title="B's Bot")
-
-    st.title("🚧 B's Bot Under Review")
-    st.info(
-        """
-        B's Bot is currently undergoing maintenance and quality improvements to ensure high-quality
-        support for students.
-
-        We expect the bot to be operational again by 31 October 2026.
-
-        Thank you for your patience.
-        """
-    )
-
-    st.stop()
 
 
 # === HELPERS ===
