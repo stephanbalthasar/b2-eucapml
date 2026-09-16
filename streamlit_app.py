@@ -20,7 +20,24 @@ from app.router import route
 from mentor.rag.booklet_retriever import extract_signals
 # ───────────────────────────────────────────────────────────────────────────────
 
+MAINTENANCE_MODE = st.secrets.get("MAINTENANCE_MODE", False)
 
+if MAINTENANCE_MODE:
+    st.set_page_config(page_title="B's Bot")
+
+    st.title("🚧 B's Bot Under Review")
+    st.info(
+        """
+        B's Bot is currently undergoing maintenance and quality improvements to ensure high-quality
+        support for students.
+
+        We expect the bot to be operational again by 31 October 2026.
+
+        Thank you for your patience.
+        """
+    )
+
+    st.stop()
 
 # === HELPERS ===
 # === APP BAR ===
@@ -430,13 +447,8 @@ with st.sidebar:
 
     model = st.selectbox(
         "Model",
-        ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"],
+        ["qwen/qwen3.8-27b"],
         index=0,
-        help=(
-            "Model choice:\n"
-            "• llama‑3.1‑8b‑instant → faster, cheaper; good for drafts and everyday Q&A.\n"
-            "• llama‑3.3‑70b‑versatile → slower, more capable; better for nuanced legal analysis."
-        ),
     )
 
     temp = st.slider(
@@ -828,7 +840,7 @@ with tab_chat:
         else:
             answer = chat_engine.assist(
                 user_query=user_q,
-                model="llama-3.1-8b-instant",
+                model=model,
                 temperature=0.6,
                 max_tokens=350,
             )

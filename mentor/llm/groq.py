@@ -92,8 +92,4 @@ class GroqClient:
                 break
 
         # Bubble a gentle message upward (caller can show it in UI)
-        raise RuntimeError(
-            "Temporarily rate‑limited or service busy. Please wait a few seconds and try again."
-            if isinstance(last_error, HTTPError) else
-            f"Temporary network issue: {last_error}"
-        )
+        raise RuntimeError(f"Groq returned: {last_error}")
